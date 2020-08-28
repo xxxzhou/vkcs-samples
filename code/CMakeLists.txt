@@ -18,6 +18,10 @@ else()
     message(FATAL_ERROR "unsupported platform.")
 endif()
 
+if(MSVC)
+    set(CMAKE_EXE_LINKER_FLAGS "/WX:NO ${CMAKE_EXE_LINKER_FLAGS}" ) 
+endif()
+
 # 项目存放的资源目录
 set(SAMPLES_DATA_DIR ${SAMPLES_DATA_DIR} "${CMAKE_SOURCE_DIR}/code/data")
 # 收集项目的shader文件
@@ -25,6 +29,8 @@ set(SHADER_FILES ${SHADER_FILES} "")
 
 # 添加头文件搜索包含目录(资源/utils/vulkan/shader生成目录)
 include_directories(${SAMPLES_DATA_DIR} ${GLMINC_PREFIX} ${Vulkan_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+
+add_subdirectory(common)
 
 # 执行vkcs1目录下的cmakelists
 add_subdirectory(vkcs1)

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.2)
 
 set(scr_paths "")
-file(GLOB scr_paths *.cpp)
+file(GLOB scr_paths "*.cpp" "*.hpp" "*.h")
 # aux_source_directory(./ scr_paths)
 message(STATUS "xxxx-" ${scr_paths})
 set(glsl_sources ${glsl_sources})
@@ -12,6 +12,7 @@ endforeach(glsl ${glsl_sources})
 # 生成运行程序
 add_executable(vkcs1 WIN32 ${scr_paths})
 link_directories(${Vulkan_LIBRARIES})
+message(STATUS "xxxxx-" ${Vulkan_LIBRARIES})
 message(STATUS "xxxxx-" ${Vulkan_LIBRARY})
 message(STATUS "xxxxx-" ${VULKAN_LOADER_NAME})
 message(STATUS "xxxxx-" ${UTILS_NAME})

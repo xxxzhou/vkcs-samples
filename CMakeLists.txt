@@ -35,7 +35,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # 添加win32平台下的编译符号
 if(WIN32)
     # Treat warnings as errors
-    add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/WX>")
+    #add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/WX>")
     # Disable RTTI
     add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/GR->")
     # Warn about nested declarations

@@ -23,5 +23,8 @@ int main(int argc, char *argv[]) {
     init_uniform_buffer(info);
     init_renderpass(info, depthPresent);
     init_framebuffers(info, depthPresent);
+
+    
+
     return 0;
 }

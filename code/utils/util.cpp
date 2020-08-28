@@ -56,10 +56,10 @@ static android_app *Android_application = nullptr;
 
 using namespace std;
 
-#if !(defined(__ANDROID__) || defined(VK_USE_PLATFORM_METAL_EXT))
-// Android, iOS, and macOS: main() implemented externally to allow access to Objective-C components
-int main(int argc, char **argv) { return sample_main(argc, argv); }
-#endif
+// #if !(defined(__ANDROID__) || defined(VK_USE_PLATFORM_METAL_EXT))
+// // Android, iOS, and macOS: main() implemented externally to allow access to Objective-C components
+// int main(int argc, char **argv) { return sample_main(argc, argv); }
+// #endif
 
 void extract_version(uint32_t version, uint32_t &major, uint32_t &minor, uint32_t &patch) {
     major = version >> 22;
