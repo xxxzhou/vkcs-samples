@@ -28,9 +28,41 @@ include(GNUInstallDirs)
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND WIN32)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "default install path" FORCE)
 endif()
+if (NOT CMAKE_BUILD_TYPE)
+  # CMake defaults to leaving CMAKE_BUILD_TYPE empty. This screws up
+  # differentiation between debug and release builds.
+  set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build, options are: None (CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif()
 
 # 支持方案里工程分文件夹(类似VS里的工程分成几个组,配合SET_PROPERTY(TARGET xxxa PROPERTY FOLDER "xxx") )
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+# 设置build的子目录
+set(VKX_RUNTIME_DIR ${CMAKE_BINARY_DIR}/bin)
+set(VKX_LIBRARY_DIR ${CMAKE_BINARY_DIR}/lib)
+# 生成目录
+function(vkx_output targetname)
+    message(STATUS "---" ${targetname} "---" ${VKX_RUNTIME_DIR})
+    set_target_properties(${targetname} PROPERTIES 
+    LIBRARY_OUTPUT_DIRECTORY ${VKX_LIBRARY_DIR} 
+    RUNTIME_OUTPUT_DIRECTORY ${VKX_RUNTIME_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY ${VKX_LIBRARY_DIR}
+    )
+endfunction(vkx_output)
+# 生成目录复制 ${CMAKE_BUILD_TYPE}
+function(vkx_install targetname)
+    message(STATUS "----" ${targetname} "----" ${CMAKE_BUILD_TYPE})
+    install(TARGETS ${targetname}    
+    RUNTIME DESTINATION "${CMAKE_BUILD_TYPE}/bin" CONFIGURATIONS Debug None ""
+    LIBRARY DESTINATION "${CMAKE_BUILD_TYPE}/lib" CONFIGURATIONS Debug None ""
+    ARCHIVE DESTINATION "${CMAKE_BUILD_TYPE}/lib" CONFIGURATIONS Debug None ""
+    )
+    install(FILES ${VKX_RUNTIME_DIR}/Debug/${targetname}.pdb
+    DESTINATION ${CMAKE_BUILD_TYPE}/bin
+    CONFIGURATIONS Debug
+    )
+endfunction(vkx_install)
+
 
 # 添加win32平台下的编译符号
 if(WIN32)
@@ -66,10 +98,6 @@ endif()
 
 find_program(GLSLANG_VALIDATOR NAMES ${GLSLANG_VALIDATOR_NAME} HINTS "${PROJECT_SOURCE_DIR}/glslang/bin")
 
-# 设置build的子目录
-set(BUILDTGT_DIR build)
-set(BINDATA_DIR Bin)
-set(LIBSOURCE_DIR Lib)
 # 添加一个预编译符
 add_definitions(-DAPI_NAME="${vulkan}")
 # 如果选择clang编译器(android下会用)
@@ -93,6 +121,7 @@ endif()
 set(PYTHON_CMD ${PYTHON_EXECUTABLE})
 set(UTILS_NAME vsamputils)
 set(UTILS_DIR "${CMAKE_SOURCE_DIR}/code/utils")
+set(COMMON_DIR "${CMAKE_SOURCE_DIR}/code/common")
 
 add_definitions(-DVULKAN_SAMPLES_BASE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -105,7 +134,7 @@ if(NOT EXISTS ${GLMINC_PREFIX})
 endif()
 
 # 当前方案下所有项目,头文件搜索包含目录
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/code/utils)
+include_directories(${UTILS_DIR} ${COMMON_DIR} )
 # code目录下的CMakeLists.txt开始执行
 add_subdirectory(code)
 

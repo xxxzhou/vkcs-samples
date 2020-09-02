@@ -11,7 +11,7 @@ endmacro(glsl_to_spirv src basename)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # 添加用于不同平台窗口初始化的预编译指令
-    add_definitions(-DVK_USE_PLATFORM_WIN32_KHR -DWIN32_LEAN_AND_MEAN)
+    add_definitions(-DVK_USE_PLATFORM_WIN32_KHR -DWIN32_LEAN_AND_MEAN)    
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR)
 else()
@@ -29,6 +29,7 @@ set(SHADER_FILES ${SHADER_FILES} "")
 
 # 添加头文件搜索包含目录(资源/utils/vulkan/shader生成目录)
 include_directories(${SAMPLES_DATA_DIR} ${GLMINC_PREFIX} ${Vulkan_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+link_directories(${VKX_LIBRARY_DIR})
 
 add_subdirectory(common)
 

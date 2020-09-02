@@ -22,13 +22,15 @@ class VulkanBuffer {
     /* data */
     VkBuffer buffer;
     VkDeviceMemory memory;
+    VkDevice device;
+    VkBufferView view;
 
    public:
-    VulkanBuffer(/* args */);
+    VulkanBuffer();
     ~VulkanBuffer();
 
    public:
-    void InitResource(VkDevice device, uint32_t dataSize,
+    void InitResource(VkDevice _device, uint32_t dataSize, VkFormat viewFormat,
                       VkBufferUsageFlagBits usageFlag, uint32_t memoryTypeIndex,
                       uint8_t *cpuData = nullptr);
 };

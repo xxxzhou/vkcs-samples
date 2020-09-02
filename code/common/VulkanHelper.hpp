@@ -28,6 +28,16 @@
     }
 #endif
 
+#if defined(__ANDROID__)
+// Missing from the NDK
+namespace std {
+template <typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args) {
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
+}  // namespace std
+#endif
+
 namespace vkx {
 namespace common {
 // errorcode转显示
@@ -38,14 +48,16 @@ VKX_COMMON_EXPORT std::string physicalDeviceTypeString(
 // 创建一个vulkan实例
 VKX_COMMON_EXPORT VkResult createInstance(VkInstance instance,
                                           const char* appName);
-// 得到所有物体显卡
+// 得到所有物理显卡
 VKX_COMMON_EXPORT VkResult enumerateDevice(
     VkInstance instance, std::vector<vkx::PhysicalDevice>& physicalDevices);
-// 创建一个满足的逻辑设置,是否使用单独的计算通道
+// 创建一个满足条件的逻辑设置,是否使用单独的计算通道
 VKX_COMMON_EXPORT VkResult createLogicalDevice(
     vkx::LogicalDevice& device, const vkx::PhysicalDevice& physicalDevice,
-    bool bAloneCompute = false);
-//
-
+    uint32_t queueFamilyIndex, bool bAloneCompute = false);
+VKX_COMMON_EXPORT bool getMemoryTypeIndex(
+    const vkx::PhysicalDevice& physicalDevice, uint32_t typeBits,
+    VkFlags quirementsMaks, uint32_t& index);
+VKX_COMMON_EXPORT int32_t getByteSize(VkFormat format);
 }  // namespace common
 }  // namespace vkx

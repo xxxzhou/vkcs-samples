@@ -4,13 +4,25 @@
 
 namespace vkx {
 namespace common {
-VulkanBuffer::VulkanBuffer(/* args */) {}
+VulkanBuffer::VulkanBuffer() {}
 
-VulkanBuffer::~VulkanBuffer() {}
+VulkanBuffer::~VulkanBuffer() {
+    if (view) {
+        vkDestroyBufferView(device, view, nullptr);
+    }
+    if (buffer) {
+        vkDestroyBuffer(device, buffer, nullptr);
+    }
+    if (memory) {
+        vkFreeMemory(device, memory, nullptr);
+    }
+}
 
-void VulkanBuffer::InitResource(VkDevice device, uint32_t dataSize,
+void VulkanBuffer::InitResource(VkDevice _device, uint32_t dataSize,
+                                VkFormat viewFormat,
                                 VkBufferUsageFlagBits usageFlag,
                                 uint32_t memoryTypeIndex, uint8_t *cpuData) {
+    this->device = _device;
     VkBufferCreateInfo bufInfo = {};
     bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufInfo.pNext = nullptr;
@@ -41,6 +53,15 @@ void VulkanBuffer::InitResource(VkDevice device, uint32_t dataSize,
         vkUnmapMemory(device, memory);
     }
     VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, memory, 0));
+
+    VkBufferViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO;
+    viewInfo.pNext = nullptr;
+    viewInfo.buffer = buffer;
+    viewInfo.format = viewFormat;  // VK_FORMAT_R32_SFLOAT;
+    viewInfo.offset = 0;
+    viewInfo.range = requires.size;
+    VK_CHECK_RESULT(vkCreateBufferView(device, &viewInfo, nullptr, &view));
 }
 }  // namespace common
 }  // namespace vkx

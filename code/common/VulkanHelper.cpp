@@ -139,26 +139,27 @@ VkResult enumerateDevice(VkInstance instance,
 
 VkResult createLogicalDevice(vkx::LogicalDevice& device,
                              const vkx::PhysicalDevice& physicalDevice,
-                             bool bAloneCompute) {
+                             uint32_t queueFamilyIndex, bool bAloneCompute) {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 
     float queuePriorities[1] = {0.0};
     VkDeviceQueueCreateInfo queueInfo = {};
     queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueInfo.queueFamilyIndex = physicalDevice.queueGraphicsIndexs[0];
+    queueInfo.queueFamilyIndex = queueFamilyIndex;
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = queuePriorities;
     queueCreateInfos.push_back(queueInfo);
     device.graphicsIndex = queueInfo.queueFamilyIndex;
     if (bAloneCompute) {
-        uint32_t index = physicalDevice.queueGraphicsIndexs[0];
+        // 找一个在通道只有CS,没有GS
+        uint32_t index = queueFamilyIndex;
         for (auto cindex : physicalDevice.queueComputeIndexs) {
             if (cindex != index) {
-                cindex = index;
+                index = cindex;
                 break;
             }
         }
-        if (index != physicalDevice.queueGraphicsIndexs[0]) {
+        if (index != queueFamilyIndex) {
             queueInfo = {};
             queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             queueInfo.queueFamilyIndex = index;
@@ -180,6 +181,34 @@ VkResult createLogicalDevice(vkx::LogicalDevice& device,
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.data();
     return vkCreateDevice(physicalDevice.physicalDevice, &deviceCreateInfo,
                           nullptr, &device.device);
+}
+int32_t getByteSize(VkFormat format) {
+    switch (format) {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            return 4;
+            break;
+        default:
+            break;
+    }
+    return 4;
+}
+
+bool getMemoryTypeIndex(const vkx::PhysicalDevice& physicalDevice,
+                        uint32_t typeBits, VkFlags quirementsMaks,
+                        uint32_t& index) {
+    for (uint32_t i = 0; i < physicalDevice.mempryProperties.memoryTypeCount;
+         i++) {
+        if ((typeBits & 1) == 1) {
+            // Type is available, does it match user properties?
+            if ((physicalDevice.mempryProperties.memoryTypes[i].propertyFlags &
+                 quirementsMaks) == quirementsMaks) {
+                index = i;
+                return true;
+            }
+        }
+        typeBits >>= 1;
+    }
+    return false;
 }
 }  // namespace common
 }  // namespace vkx

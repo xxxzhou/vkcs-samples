@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #ifdef _WIN32
+#elif defined(VK_USE_PLATFORM_WIN32_KHR)
 #include <windows.h>
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/asset_manager.h>
@@ -40,4 +41,5 @@ struct LogicalDevice {
     // 选用的计算通道过些
     uint32_t computeIndex;
 };
+
 }  // namespace vkx
