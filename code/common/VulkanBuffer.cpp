@@ -1,7 +1,7 @@
 #include "VulkanBuffer.hpp"
 
+#include "VulkanContext.hpp"
 #include "VulkanHelper.hpp"
-
 namespace vkx {
 namespace common {
 VulkanBuffer::VulkanBuffer() {}
@@ -18,11 +18,12 @@ VulkanBuffer::~VulkanBuffer() {
     }
 }
 
-void VulkanBuffer::InitResource(VkDevice _device, uint32_t dataSize,
+void VulkanBuffer::InitResource(class VulkanContext* context, uint32_t dataSize,
                                 VkFormat viewFormat,
                                 VkBufferUsageFlagBits usageFlag,
-                                uint32_t memoryTypeIndex, uint8_t *cpuData) {
-    this->device = _device;
+                                VkMemoryPropertyFlagBits memoryFlag,
+                                uint8_t* cpuData) {
+    this->device = context->logicalDevice.device;
     VkBufferCreateInfo bufInfo = {};
     bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufInfo.pNext = nullptr;
@@ -34,10 +35,13 @@ void VulkanBuffer::InitResource(VkDevice _device, uint32_t dataSize,
     bufInfo.flags = 0;
     // 生成一个buffer标识(可以多个标识到同一个显存空间DeviceMemory里,标识用来指定VBO/IBO/UBO等)
     VK_CHECK_RESULT(vkCreateBuffer(device, &bufInfo, nullptr, &buffer));
-
     VkMemoryRequirements requires;
     vkGetBufferMemoryRequirements(device, buffer, &requires);
-
+    uint32_t memoryTypeIndex = 0;
+    bool getIndex =
+        getMemoryTypeIndex(context->physicalDevice, requires.memoryTypeBits,
+                           memoryFlag, memoryTypeIndex);
+    assert(getIndex == true);
     VkMemoryAllocateInfo memoryInfo = {};
     memoryInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memoryInfo.pNext = nullptr;
@@ -46,9 +50,9 @@ void VulkanBuffer::InitResource(VkDevice _device, uint32_t dataSize,
     // 生成设备显存空间
     VK_CHECK_RESULT(vkAllocateMemory(device, &memoryInfo, nullptr, &memory));
     if (cpuData) {
-        uint8_t *pData = nullptr;
+        uint8_t* pData = nullptr;
         VK_CHECK_RESULT(
-            vkMapMemory(device, memory, 0, dataSize, 0, (void **)&pData));
+            vkMapMemory(device, memory, 0, dataSize, 0, (void**)&pData));
         memcpy(pData, cpuData, dataSize);
         vkUnmapMemory(device, memory);
     }
@@ -62,6 +66,10 @@ void VulkanBuffer::InitResource(VkDevice _device, uint32_t dataSize,
     viewInfo.offset = 0;
     viewInfo.range = requires.size;
     VK_CHECK_RESULT(vkCreateBufferView(device, &viewInfo, nullptr, &view));
+
+    info.buffer = buffer;
+    info.offset = 0;
+    info.range = dataSize;
 }
 }  // namespace common
 }  // namespace vkx

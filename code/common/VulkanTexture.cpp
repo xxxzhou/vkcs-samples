@@ -1,5 +1,6 @@
 #include "VulkanTexture.hpp"
 
+#include "VulkanContext.hpp"
 #include "VulkanHelper.hpp"
 
 namespace vkx {
@@ -21,23 +22,29 @@ VulkanTexture::~VulkanTexture() {
     }
 }
 
-void VulkanTexture::InitResource(VkDevice _device, uint32_t width,
+void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
                                  uint32_t height, VkFormat format,
                                  VkImageUsageFlags usageFlag,
-                                 uint32_t memoryTypeIndex, uint8_t *cpuData,
-                                 uint8_t cpuPitch) {
-    this->device = _device;
+                                 VkMemoryPropertyFlagBits memoryFlag,
+                                 uint8_t *cpuData, uint8_t cpuPitch) {
+    this->device = context->logicalDevice.device;
     bool bGpu = cpuData == nullptr;
+    this->width = width;
+    this->height = height;
+    this->format = format;
+    VkFormatProperties props;
+    vkGetPhysicalDeviceFormatProperties(context->physicalDevice.physicalDevice,
+                                        format, &props);
+
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.pNext = nullptr;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.format = format;  //一般VK_FORMAT_R8G8B8A8_UNORM
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
+    imageInfo.extent = {width, height, 1};
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageInfo.tiling = bGpu ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR;
     // VK_IMAGE_LAYOUT_PREINITIALIZED 内存数据初始化,可以直接存储在设备内存
     imageInfo.initialLayout =
@@ -50,9 +57,13 @@ void VulkanTexture::InitResource(VkDevice _device, uint32_t width,
     imageInfo.flags = 0;
     // 创建image
     VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
-
     VkMemoryRequirements requires;
     vkGetImageMemoryRequirements(device, image, &requires);
+    uint32_t memoryTypeIndex = 0;
+    bool getIndex =
+        getMemoryTypeIndex(context->physicalDevice, requires.memoryTypeBits,
+                           memoryFlag, memoryTypeIndex);
+    assert(getIndex == true);
     VkMemoryAllocateInfo memoryInfo = {};
     memoryInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memoryInfo.pNext = nullptr;

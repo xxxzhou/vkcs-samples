@@ -4,27 +4,30 @@
 
 namespace vkx {
 namespace common {
-class VKX_COMMON_EXPORT VulkanTexture {    
+class VKX_COMMON_EXPORT VulkanTexture {
    private:
-    VkImage image;
     VkDeviceMemory memory;
     VkDevice device;
-    VkSampler sampler;
-    // image可能创建多个mipmap,多层级图像,view针对具体
-    VkImageView view;
 
    public:
     uint32_t width;
     uint32_t height;
     VkFormat format;
+    VkSampler sampler;
+    // image可能创建多个mipmap,多层级图像,view针对具体
+    VkImageView view;
+    VkImage image;
+
    public:
     VulkanTexture();
     ~VulkanTexture();
+
    public:
-    void InitResource(VkDevice _device, uint32_t width, uint32_t height,
-                      VkFormat format, VkImageUsageFlags usageFlag,
-                      uint32_t memoryTypeIndex, uint8_t *cpuData,
-                      uint8_t cpuPitch);
+    void InitResource(class VulkanContext* context, uint32_t width,
+                      uint32_t height, VkFormat format,
+                      VkImageUsageFlags usageFlag,
+                      VkMemoryPropertyFlagBits memoryFlag,
+                      uint8_t* cpuData = nullptr, uint8_t cpuPitch = 0);
 };
 }  // namespace common
 }  // namespace vkx

@@ -46,7 +46,7 @@ VKX_COMMON_EXPORT std::string errorString(VkResult errorCode);
 VKX_COMMON_EXPORT std::string physicalDeviceTypeString(
     VkPhysicalDeviceType type);
 // 创建一个vulkan实例
-VKX_COMMON_EXPORT VkResult createInstance(VkInstance instance,
+VKX_COMMON_EXPORT VkResult createInstance(VkInstance& instance,
                                           const char* appName);
 // 得到所有物理显卡
 VKX_COMMON_EXPORT VkResult enumerateDevice(

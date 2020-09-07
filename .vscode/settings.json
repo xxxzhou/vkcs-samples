@@ -48,7 +48,12 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xutility": "cpp",
-        "functional": "cpp"
+        "functional": "cpp",
+        "algorithm": "cpp",
+        "iterator": "cpp",
+        "string_view": "cpp",
+        "map": "cpp",
+        "xtree": "cpp"
     },
     "C_Cpp.clang_format_style": "{ BasedOnStyle: Google, IndentWidth: 4}"
 }

@@ -51,12 +51,14 @@ std::string physicalDeviceTypeString(VkPhysicalDeviceType type) {
     }
 }
 
-VkResult createInstance(VkInstance instance, const char* appName) {
+VkResult createInstance(VkInstance& instance, const char* appName) {
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = appName;
     appInfo.pEngineName = appName;
     appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.applicationVersion = 1;
+    appInfo.engineVersion = 1;
 
     std::vector<const char*> instanceExtensions = {
         VK_KHR_SURFACE_EXTENSION_NAME};
@@ -150,6 +152,7 @@ VkResult createLogicalDevice(vkx::LogicalDevice& device,
     queueInfo.pQueuePriorities = queuePriorities;
     queueCreateInfos.push_back(queueInfo);
     device.graphicsIndex = queueInfo.queueFamilyIndex;
+    device.computeIndex = device.graphicsIndex;
     if (bAloneCompute) {
         // 找一个在通道只有CS,没有GS
         uint32_t index = queueFamilyIndex;

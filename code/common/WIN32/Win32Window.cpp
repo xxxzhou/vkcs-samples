@@ -2,13 +2,13 @@
 
 #include <iostream>
 
-#include "../VulkanSwapChain.hpp"
+#include "../VulkanWindow.hpp"
 
 namespace vkx {
 namespace common {
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    VulkanSwapChain *swapChain = reinterpret_cast<VulkanSwapChain *>(
+    VulkanWindow *swapChain = reinterpret_cast<VulkanWindow *>(
         GetWindowLongPtr(hWnd, GWLP_USERDATA));
     if (swapChain) {
         swapChain->handleMessage(uMsg, wParam, lParam);
@@ -22,7 +22,7 @@ Win32Window::~Win32Window() {}
 
 HWND Win32Window::InitWindow(HINSTANCE inst, int width, int height,
                              const char *name,
-                             class VulkanSwapChain *swapChain) {
+                             class VulkanWindow *swapChain) {
     WNDCLASSEX wndClass;
 
     wndClass.cbSize = sizeof(WNDCLASSEX);

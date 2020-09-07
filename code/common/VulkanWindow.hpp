@@ -8,23 +8,36 @@
 #endif
 #include <functional>
 
+#include "VulkanContext.hpp"
+
 namespace vkx {
 namespace common {
-class VKX_COMMON_EXPORT VulkanSwapChain {
+template class VKX_COMMON_EXPORT std::unique_ptr<VulkanTexture>;
+template class VKX_COMMON_EXPORT std::vector<VkImage>;
+template class VKX_COMMON_EXPORT std::vector<VkImageView>;
+template class VKX_COMMON_EXPORT std::vector<VkFramebuffer>;
+template class VKX_COMMON_EXPORT std::vector<VkCommandBuffer>;
+template class VKX_COMMON_EXPORT std::unique_ptr<Win32Window>;
+template class VKX_COMMON_EXPORT std::function<void(uint32_t)>;
+class VKX_COMMON_EXPORT VulkanWindow {
    private:
+    class VulkanContext* context;
     VkSurfaceKHR surface;
     VkInstance instance;
-    PhysicalDevice* physicalDevice;
+    VkPhysicalDevice physicalDevice;
     VkDevice device;
-    VkSwapchainKHR swapChain;
+    VkSwapchainKHR swapChain = VK_NULL_HANDLE;
+    std::unique_ptr<VulkanTexture> depthTex;
     std::vector<VkImage> images;
     std::vector<VkImageView> views;
     VkCommandPool cmdPool;
+    std::vector<VkFramebuffer> frameBuffers;
     std::vector<VkCommandBuffer> cmdBuffers;
 #if defined(_WIN32)
     std::unique_ptr<Win32Window> window;
 #endif
-    VkQueue queue;
+    // 用于通知CPU,GPU上图像已经呈现出来
+    VkFence presentFence;
     // 图像被获取,可以开始渲染
     VkSemaphore presentComplete;
     // 图像已经渲染,可以呈现
@@ -34,21 +47,30 @@ class VKX_COMMON_EXPORT VulkanSwapChain {
     VkPipelineStageFlags submitPipelineStages =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     std::function<void(uint32_t)> onDraw;
+    VkQueue graphicsQueue;
+    VkQueue presentQueue;
+    bool bCanDraw = false;
+    VkCommandBufferBeginInfo cmdBufferBeginInfo = {};
+    VkRenderPassBeginInfo renderPassBeginInfo = {};
+    VkViewport viewport = {};
+    VkRect2D scissor = {};
+    VkClearValue clearValues[2];
 
    public:
-    uint32_t selectGraphicsIndex = UINT32_MAX;
-    uint32_t selectPresentIndex = UINT32_MAX;
+    uint32_t graphicsQueueIndex = UINT32_MAX;
+    uint32_t presentQueueIndex = UINT32_MAX;
     VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
-    uint32_t widht;
+    VkFormat depthFormat = VK_FORMAT_D16_UNORM;
+    uint32_t width;
     uint32_t height;
     bool vsync = false;
     uint32_t imageCount;
-    uint32_t currentBuffer;
-    bool bCanDraw = false;
+    uint32_t currentIndex;
+    VkRenderPass renderPass;
 
    public:
-    VulkanSwapChain(VkInstance _instance, PhysicalDevice* _physicalDevice);
-    ~VulkanSwapChain();
+    VulkanWindow(class VulkanContext* _context);
+    ~VulkanWindow();
     // 没有外部窗口,自己创建
 #if defined(_WIN32)
     void InitWindow(HINSTANCE inst, uint32_t _width, uint32_t height,
@@ -64,10 +86,16 @@ class VKX_COMMON_EXPORT VulkanSwapChain {
 #endif
     void CreateSwipChain(VkDevice _device,
                          std::function<void(uint32_t)> onDrawAction);
+
     void Run();
 
    private:
     void reSwapChain();
+    void createRenderPass();
+    void createFrameBuffer();
+
+    void beginFrame();
+    void endFrame();
 };
 }  // namespace common
 }  // namespace vkx
