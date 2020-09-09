@@ -1,13 +1,17 @@
 cmake_minimum_required(VERSION 3.10.2)
 
 # 把相应的glsl代码转化成SPIR-V代码
-macro(glsl_to_spirv src basename)
+macro(glsl_to_spirv src)
     # 调用python脚本执行glslangValidator 编译文件 生成文件(很多变量来自根cmake文件)
     add_custom_command(OUTPUT ${src}.h COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/generate_spirv.py 
-    ${CMAKE_CURRENT_SOURCE_DIR}/${basename}/${src} ${CMAKE_CURRENT_BINARY_DIR}/${src}.h ${GLSLANG_VALIDATOR} false 
+    ${CMAKE_CURRENT_SOURCE_DIR}/${src} ${CMAKE_CURRENT_BINARY_DIR}/${src}.h ${GLSLANG_VALIDATOR} false 
     DEPENDS ${CMAKE_SOURCE_DIR}/scripts/generate_spirv.py 
-    ${CMAKE_CURRENT_SOURCE_DIR}/${basename}/${src} ${CMAKE_CURRENT_BINARY_DIR}/${src}.h ${GLSLANG_VALIDATOR})
-endmacro(glsl_to_spirv src basename)
+    ${CMAKE_CURRENT_SOURCE_DIR}/${src} ${CMAKE_CURRENT_BINARY_DIR}/${src}.h ${GLSLANG_VALIDATOR})
+    message(STATUS ${src} "---source:" ${CMAKE_CURRENT_SOURCE_DIR}/${src})
+    message(STATUS ${src} "---generate:" ${CMAKE_CURRENT_BINARY_DIR}/${src}.h)
+    # 强制生成执行
+    add_custom_target(run ALL DEPENDS ${src}.h)
+endmacro(glsl_to_spirv src)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     # 添加用于不同平台窗口初始化的预编译指令

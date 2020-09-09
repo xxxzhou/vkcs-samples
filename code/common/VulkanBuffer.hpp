@@ -19,23 +19,24 @@ enum BufferUsage {
 // (CPU不可写,Computer shader)(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 // memory与view的关系应该是一对多,本类专门用于UBO,表示一块容易每桢修改的块
 // 后期专门设计一个memory对应多个view的类。(可以一个mesh的IBO,VBO放一起,也可多Mesh放一块)
-class VulkanBuffer {
-   private:
-    /* data */
-    VkBuffer buffer;
+class VKX_COMMON_EXPORT VulkanBuffer {
+   private:    
     VkDeviceMemory memory;
     VkDevice device;
     VkBufferView view;
-    VkDescriptorBufferInfo info;
+    VkDescriptorBufferInfo descInfo;
 
    public:
     VulkanBuffer();
     ~VulkanBuffer();
 
    public:
+    VkBuffer buffer;
+
+   public:
     void InitResource(class VulkanContext* context, uint32_t dataSize,
-                      VkFormat viewFormat, VkBufferUsageFlagBits usageFlag,
-                      VkMemoryPropertyFlagBits memoryFlag,
+                      VkFormat viewFormat, VkBufferUsageFlags usageFlag,
+                      VkMemoryPropertyFlags memoryFlag,
                       uint8_t* cpuData = nullptr);
 };
 }  // namespace common

@@ -25,19 +25,27 @@ VulkanTexture::~VulkanTexture() {
 void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
                                  uint32_t height, VkFormat format,
                                  VkImageUsageFlags usageFlag,
-                                 VkMemoryPropertyFlagBits memoryFlag,
+                                 VkMemoryPropertyFlags memoryFlag,
                                  uint8_t *cpuData, uint8_t cpuPitch) {
     this->device = context->logicalDevice.device;
     bool bGpu = cpuData == nullptr;
     this->width = width;
     this->height = height;
     this->format = format;
-    VkFormatProperties props;
-    vkGetPhysicalDeviceFormatProperties(context->physicalDevice.physicalDevice,
-                                        format, &props);
+    // 重新初始化
+    layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (!bGpu) {
+        // 初始化只能UNDEFINED/PREINITIALIZED,PREINITIALIZED可以用内存数据初始化
+        layout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    }
+    stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    // SRV,UVA资源一般不支持LINEAR格式,LINEAR限制较大,请先检查是否支持相应UsageFlag
+    VkImageTiling tiling =
+        bGpu ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR;
 
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.flags = 0;
     imageInfo.pNext = nullptr;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.format = format;  //一般VK_FORMAT_R8G8B8A8_UNORM
@@ -45,16 +53,14 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.tiling = bGpu ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR;
+    imageInfo.tiling = tiling;
     // VK_IMAGE_LAYOUT_PREINITIALIZED 内存数据初始化,可以直接存储在设备内存
-    imageInfo.initialLayout =
-        bGpu ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_PREINITIALIZED;
-    imageInfo.usage = usageFlag;
+    imageInfo.initialLayout = layout;
+    imageInfo.usage = usageFlag;  // usageFlag;
     // 一般来说,我们只需要单队列访问 VK_SHARING_MODE_EXCLUSIVE,故为0
     imageInfo.queueFamilyIndexCount = 0;
     imageInfo.pQueueFamilyIndices = nullptr;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.flags = 0;
     // 创建image
     VK_CHECK_RESULT(vkCreateImage(device, &imageInfo, nullptr, &image));
     VkMemoryRequirements requires;
@@ -84,16 +90,25 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
         vkGetImageSubresourceLayout(device, image, &subres, &layout);
         VK_CHECK_RESULT(
             vkMapMemory(device, memory, 0, requires.size, 0, (void **)&pData));
-        // cpu pitch,这个做为参数传入感觉更好
         // uint8_t cpuPitch = width * getByteSize(format);
         if (cpuPitch != 0 && cpuPitch != layout.rowPitch) {
             assert(layout.rowPitch >= cpuPitch);
-            for (int i = 0; i < height; i++) {
+            for (uint32_t i = 0; i < height; i++) {
                 memcpy(pData + layout.rowPitch * i, cpuData + i * cpuPitch,
                        cpuPitch);
             }
         } else {
             memcpy(pData, cpuData, requires.size);
+        }
+        // 这段逻辑需要再考虑下
+        if ((memoryFlag & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+            VkMappedMemoryRange memRange;
+            memRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+            memRange.pNext = nullptr;
+            memRange.memory = memory;
+            memRange.offset = 0;
+            memRange.size = requires.size;
+            VK_CHECK_RESULT(vkFlushMappedMemoryRanges(device, 1, &memRange));
         }
         vkUnmapMemory(device, memory);
     }
@@ -133,6 +148,28 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
     VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &view));
+
+    descInfo.imageLayout = layout;
+    descInfo.imageView = view;
+    descInfo.sampler = sampler;
 }
+
+void VulkanTexture::ChangeLayout(VkCommandBuffer command,
+                                 VkImageLayout newLayout,
+                                 VkPipelineStageFlags newStageFlags) {
+    // 这段逻辑要考虑下,可能只是想插入一个Barrier
+    if (layout == newLayout && stageFlags == newStageFlags) {
+        return;
+    }
+    VkImageLayout oldLayout = layout;
+    VkPipelineStageFlags oldStageFlags = stageFlags;
+
+    changeLayout(command, image, oldLayout, newLayout, oldStageFlags,
+                 newStageFlags, VK_IMAGE_ASPECT_COLOR_BIT);
+    layout = newLayout;
+    stageFlags = newStageFlags;
+    descInfo.imageLayout = layout;
+}
+
 }  // namespace common
 }  // namespace vkx

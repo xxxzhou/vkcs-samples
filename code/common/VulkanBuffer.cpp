@@ -20,8 +20,8 @@ VulkanBuffer::~VulkanBuffer() {
 
 void VulkanBuffer::InitResource(class VulkanContext* context, uint32_t dataSize,
                                 VkFormat viewFormat,
-                                VkBufferUsageFlagBits usageFlag,
-                                VkMemoryPropertyFlagBits memoryFlag,
+                                VkBufferUsageFlags usageFlag,
+                                VkMemoryPropertyFlags memoryFlag,
                                 uint8_t* cpuData) {
     this->device = context->logicalDevice.device;
     VkBufferCreateInfo bufInfo = {};
@@ -54,6 +54,16 @@ void VulkanBuffer::InitResource(class VulkanContext* context, uint32_t dataSize,
         VK_CHECK_RESULT(
             vkMapMemory(device, memory, 0, dataSize, 0, (void**)&pData));
         memcpy(pData, cpuData, dataSize);
+        // 这段逻辑需要再考虑下
+        if ((memoryFlag & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+            VkMappedMemoryRange memRange;
+            memRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+            memRange.pNext = nullptr;
+            memRange.memory = memory;
+            memRange.offset = 0;
+            memRange.size = requires.size;
+            VK_CHECK_RESULT(vkFlushMappedMemoryRanges(device, 1, &memRange));
+        }
         vkUnmapMemory(device, memory);
     }
     VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, memory, 0));
@@ -67,9 +77,9 @@ void VulkanBuffer::InitResource(class VulkanContext* context, uint32_t dataSize,
     viewInfo.range = requires.size;
     VK_CHECK_RESULT(vkCreateBufferView(device, &viewInfo, nullptr, &view));
 
-    info.buffer = buffer;
-    info.offset = 0;
-    info.range = dataSize;
+    descInfo.buffer = buffer;
+    descInfo.offset = 0;
+    descInfo.range = dataSize;
 }
 }  // namespace common
 }  // namespace vkx

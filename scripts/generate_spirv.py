@@ -40,20 +40,20 @@ def identifierize(s):
     # translate leading digits
     return re.sub("^[^a-zA-Z_]+", "_", s)
 
-def compile(filename, tmpfile):
+def compile(filename, tmpfile): 
     # invoke glslangValidator or spirv-as
     try:
         if (assemble == 'true'):
             args = [executable, "-o", tmpfile, "--target-env", "spv1.0", filename]
         else:
-            args = [executable, "-V", "-H", "-o", tmpfile, filename]
+            args = [executable, "-V", "-H", "-o", tmpfile, filename] 
         output = subprocess.check_output(args, universal_newlines=True)
     except subprocess.CalledProcessError as e:
         print(e.output, file=sys.stderr)
         exit(1)
 
     # read the temp file into a list of SPIR-V words
-    words = []
+    words = [] 
     with open(tmpfile, "rb") as f:
         data = f.read()
         assert(len(data) and len(data) % 4 == 0)

@@ -97,6 +97,7 @@ if(WIN32)
 endif()
 
 find_program(GLSLANG_VALIDATOR NAMES ${GLSLANG_VALIDATOR_NAME} HINTS "${PROJECT_SOURCE_DIR}/glslang/bin")
+message(STATUS "glslangValidator path:" ${GLSLANG_VALIDATOR})
 
 # 添加一个预编译符
 add_definitions(-DAPI_NAME="${vulkan}")

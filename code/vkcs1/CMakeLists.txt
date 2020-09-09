@@ -4,12 +4,13 @@ set(scr_paths "")
 file(GLOB scr_paths "*.cpp" "*.hpp" "*.h")
 # aux_source_directory(./ scr_paths)
 message(STATUS "xxxx-" ${scr_paths})
-set(glsl_sources ${glsl_sources})
-foreach(glsl ${glsl_sources})
-    glsl_to_spirv(${SAMPLE_NAME}.vert ${SAMPLE_NAME})
-endforeach(glsl ${glsl_sources})
+file(GLOB glsl_sources "*.comp" "*.hlsl")
+
+glsl_to_spirv("cs1.comp")
 
 # 生成运行程序
+message(STATUS "xxxx-" ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_executable(vkcs1 WIN32 ${scr_paths})
 link_directories(${UTILS_NAME} ${Vulkan_LIBRARIES} ${WINLIBS})
 message(STATUS "xxxxx-" ${Vulkan_LIBRARIES})

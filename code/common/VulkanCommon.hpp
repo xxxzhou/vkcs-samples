@@ -42,4 +42,9 @@ struct LogicalDevice {
     uint32_t computeIndex;
 };
 
+struct FormatInfo {
+    uint32_t size;
+    uint32_t channelCount;
+};
+
 }  // namespace vkx

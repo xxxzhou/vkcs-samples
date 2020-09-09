@@ -1,54 +1,54 @@
 #include "VulkanPipeline.hpp"
 
 #include <algorithm>
+#include <cstdarg>
 
 #include "VulkanContext.hpp"
 namespace vkx {
 namespace common {
 
-int32_t UBOLayout::AddItem(VkDescriptorType type, VkShaderStageFlags stage,
-                           uint32_t groupIndex) {
-    if (groupIndex >= groups.size()) {
-        groups.resize(groupIndex + 1);
-        groupSize.resize(groupIndex + 1);
-        groupSize[groupIndex] = 1;
-    }
-    UBOLayoutItem item = {};
-    item.descriptorType = type;
-    item.groupIndex = groupIndex;
-    item.shaderStageFlags = stage;
-    items.push_back(item);
-    int32_t index = (int32_t)items.size() - 1;
-    groups[groupIndex].push_back(index);
-    return index;
+UBOLayout::UBOLayout(class VulkanContext* _context) {
+    this->context = _context;
 }
 
-void UBOLayout::SetGroupCount(uint32_t groupIndex, uint32_t count) {
-    assert(groupIndex < groupSize.size());
-    groupSize[groupIndex] = count;
+UBOLayout::~UBOLayout() {
+    VkDevice device = context->logicalDevice.device;
+    if (device) {
+        auto size = items.size();
+        for (auto i = 0; i < size; i++) {
+            vkDestroyDescriptorSetLayout(device, descSetLayouts[i], nullptr);
+            items[i].clear();
+        }
+        if (descPool) {
+            vkDestroyDescriptorPool(device, descPool, nullptr);
+        }
+        if (pipelineLayout) {
+            vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        }
+        // vkFreeDescriptorSets
+        items.clear();
+        descripts.clear();
+    }
+}
+
+int32_t UBOLayout::AddSetLayout(std::vector<UBOLayoutItem> layout,
+                                uint32_t count) {
+    items.push_back(layout);
+    groupSize.push_back(max(1, count));
+    return items.size() - 1;
 }
 
 void UBOLayout::GenerateLayout() {
-    // group
-    groupCount = 0;
-    for (auto i = 0; i < groups.size(); i++) {
-        if (groups[i].size() > 0) {
-            int size = groupSize[i];
-            if (size < 1) {
-                size = 1;
-            }
-            groupCount += size;
-        }
-    }
+    // 最多需要多少个set,一个layout可能有多个set,比如渲染8个相同物体
+    uint32_t groupCount = 0;
     auto size = items.size();
     for (auto i = 0; i < size; i++) {
-        int size = groupSize[items[i].groupIndex];
-        if (size < 1) {
-            size = 1;
+        groupCount += groupSize[i];
+        for (auto j = 0; j < items[i].size(); j++) {
+            // 可以假设map健值初始化为0是安全的 std::map<int,int> x;x[1]++;
+            // https://stackoverflow.com/questions/2667355/mapint-int-default-values
+            descripts[items[i][j].descriptorType] += groupSize[i];
         }
-        // 可以假设map健值初始化为0是安全的 std::map<int,int> x;x[1]++;
-        // https://stackoverflow.com/questions/2667355/mapint-int-default-values
-        descripts[items[i].descriptorType] += size;
     }
     std::vector<VkDescriptorPoolSize> poolSizes;
     for (const auto& kv : descripts) {
@@ -64,22 +64,25 @@ void UBOLayout::GenerateLayout() {
     descriptorPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolInfo.poolSizeCount = (uint32_t)poolSizes.size();
     descriptorPoolInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolInfo.maxSets = (uint32_t)groupCount;
+    descriptorPoolInfo.maxSets = groupCount;
     VK_CHECK_RESULT(vkCreateDescriptorPool(context->logicalDevice.device,
                                            &descriptorPoolInfo, nullptr,
                                            &descPool));
-    descSetLayouts.resize(groups.size());
+    descSetLayouts.resize(size);
+    descSets.resize(size);
     // 创建VkDescriptorSetLayout
-    for (auto x = 0; x < groups.size(); x++) {
-        auto& group = groups[x];
-        int j = 0;
+    for (auto x = 0; x < size; x++) {
+        auto& group = items[x];
+        if (group.size() < 1) {
+            continue;
+        }
         std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
         for (auto i = 0; i < group.size(); i++) {
             // item 对应的字段
             VkDescriptorSetLayoutBinding setLayoutBinding = {};
-            setLayoutBinding.descriptorType = items[i].descriptorType;
-            setLayoutBinding.stageFlags = items[i].descriptorType;
-            setLayoutBinding.binding = j++;
+            setLayoutBinding.descriptorType = group[i].descriptorType;
+            setLayoutBinding.stageFlags = group[i].shaderStageFlags;
+            setLayoutBinding.binding = i;
             setLayoutBinding.descriptorCount = 1;
             layoutBindings.push_back(setLayoutBinding);
         }
@@ -87,12 +90,85 @@ void UBOLayout::GenerateLayout() {
         descriptorLayoutInfo.sType =
             VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         descriptorLayoutInfo.pBindings = layoutBindings.data();
-        descriptorLayoutInfo.bindingCount = layoutBindings.size();
+        descriptorLayoutInfo.bindingCount = (uint32_t)layoutBindings.size();
+        // 生成VkDescriptorSetLayout
         VK_CHECK_RESULT(vkCreateDescriptorSetLayout(
             context->logicalDevice.device, &descriptorLayoutInfo, nullptr,
             &descSetLayouts[x]));
+        // 生成VkDescriptorSet
+        descSets[x].resize(groupSize[x]);
+        VkDescriptorSetAllocateInfo descAllocInfo = {};
+        descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        descAllocInfo.descriptorPool = descPool;
+        descAllocInfo.pSetLayouts = &descSetLayouts[x];
+        descAllocInfo.descriptorSetCount = groupSize[x];
+        VK_CHECK_RESULT(vkAllocateDescriptorSets(
+            context->logicalDevice.device, &descAllocInfo, descSets[x].data()));
     }
-}  // namespace common
+    // 生成pipelineLayout
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
+    pipelineLayoutCreateInfo.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutCreateInfo.setLayoutCount = descSetLayouts.size();
+    pipelineLayoutCreateInfo.pSetLayouts = descSetLayouts.data();
+    VK_CHECK_RESULT(vkCreatePipelineLayout(context->logicalDevice.device,
+                                           &pipelineLayoutCreateInfo, nullptr,
+                                           &pipelineLayout));
+}
+
+void UBOLayout::UpdateSetLayout(uint32_t groupIndex, uint32_t setIndex, ...) {
+    assert(groupIndex > 0 && groupIndex < items.size());
+    va_list args;
+    va_start(args, setIndex);
+    auto& descSet = descSets[groupIndex][setIndex];
+    auto& group = items[groupIndex];
+    std::vector<VkWriteDescriptorSet> writes;
+    for (auto i = 0; i < group.size(); i++) {
+        VkWriteDescriptorSet write = {};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = descSet;
+        write.dstBinding = i;
+        write.descriptorType = group[i].descriptorType;
+        switch (write.descriptorType) {
+            // pImageInfo里的sample
+            case VK_DESCRIPTOR_TYPE_SAMPLER:
+            // pImageInfo里的imageView与imageLayout
+            case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+            case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+            case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+            // pImageInfo里的所有成员
+            case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                write.pImageInfo = va_arg(args, const VkDescriptorImageInfo*);
+                break;
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+            case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+            case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+                write.pBufferInfo = va_arg(args, const VkDescriptorBufferInfo*);
+                break;
+            case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                write.pTexelBufferView = va_arg(args, const VkBufferView*);
+            default:
+                break;
+        }
+        write.descriptorCount = 1;
+        writes.push_back(write);
+    }
+    va_end(args);
+    vkUpdateDescriptorSets(context->logicalDevice.device,
+                           static_cast<uint32_t>(writes.size()), writes.data(),
+                           0, nullptr);
+}
+
+// for (auto i = 0; i < group.size(); i++) {
+//     VkWriteDescriptorSet writeDesc = {};
+//     writeDesc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+//     writeDesc.dstSet = descSets[x][i];
+//     writeDesc.descriptorType = type;
+//     writeDesc.dstBinding = binding;
+//     writeDesc.pBufferInfo = bufferInfo;
+//     writeDesc.descriptorCount = descriptorCount; /* code */
+// }
 
 VulkanPipeline::VulkanPipeline(/* args */) {}
 
@@ -159,7 +235,31 @@ void VulkanPipeline::CreateDefaultFixPipelineState(FixPipelineState& fix) {
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
     fix.dynamicState.flags = 0;
     fix.dynamicState.pDynamicStates = fix.dynamicStateEnables.data();
-    fix.dynamicState.dynamicStateCount = fix.dynamicStateEnables.size();
+    fix.dynamicState.dynamicStateCount =
+        (uint32_t)fix.dynamicStateEnables.size();
+}
+VkPipelineShaderStageCreateInfo VulkanPipeline::LoadShader(
+    VkDevice device, const std::string& fileName, VkShaderStageFlagBits stage) {
+    VkPipelineShaderStageCreateInfo shaderStage = {};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = stage;
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+    shaderStage.module = loadShader(androidApp->activity->assetManager,
+                                    fileName.c_str(), device);
+#else
+    shaderStage.module = loadShader(fileName.c_str(), device);
+#endif
+    shaderStage.pName = "main";
+    return shaderStage;
+}
+VkComputePipelineCreateInfo VulkanPipeline::CreateComputePipelineInfo(
+    VkPipelineLayout layout, VkPipelineShaderStageCreateInfo stageInfo) {
+    VkComputePipelineCreateInfo computePipelineInfo = {};
+    computePipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineInfo.layout = layout;
+    computePipelineInfo.flags = 0;
+    computePipelineInfo.stage = stageInfo;
+    return computePipelineInfo;
 }
 
 }  // namespace common

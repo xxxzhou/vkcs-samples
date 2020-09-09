@@ -40,6 +40,8 @@ std::unique_ptr<T> make_unique(Args&&... args) {
 
 namespace vkx {
 namespace common {
+VKX_COMMON_EXPORT const std::string getAssetPath();
+
 // errorcode转显示
 VKX_COMMON_EXPORT std::string errorString(VkResult errorCode);
 // 物理显卡类型
@@ -59,5 +61,21 @@ VKX_COMMON_EXPORT bool getMemoryTypeIndex(
     const vkx::PhysicalDevice& physicalDevice, uint32_t typeBits,
     VkFlags quirementsMaks, uint32_t& index);
 VKX_COMMON_EXPORT int32_t getByteSize(VkFormat format);
+// Load a SPIR-V shader (binary)
+#if defined(__ANDROID__)
+VkShaderModule loadShader(AAssetManager* assetManager, const char* fileName,
+                          VkDevice device);
+#else
+VKX_COMMON_EXPORT VkShaderModule loadShader(const char* fileName,
+                                            VkDevice device);
+#endif
+
+VKX_COMMON_EXPORT void changeLayout(VkCommandBuffer command, VkImage image,
+                                    VkImageLayout oldLayout,
+                                    VkImageLayout newLayout,
+                                    VkPipelineStageFlags oldStageFlags,
+                                    VkPipelineStageFlags newStageFlags,
+                                    VkImageAspectFlags aspectMask);
+
 }  // namespace common
 }  // namespace vkx

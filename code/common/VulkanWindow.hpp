@@ -28,11 +28,9 @@ class VKX_COMMON_EXPORT VulkanWindow {
     VkDevice device;
     VkSwapchainKHR swapChain = VK_NULL_HANDLE;
     std::unique_ptr<VulkanTexture> depthTex;
-    std::vector<VkImage> images;
     std::vector<VkImageView> views;
     VkCommandPool cmdPool;
     std::vector<VkFramebuffer> frameBuffers;
-    std::vector<VkCommandBuffer> cmdBuffers;
 #if defined(_WIN32)
     std::unique_ptr<Win32Window> window;
 #endif
@@ -67,6 +65,8 @@ class VKX_COMMON_EXPORT VulkanWindow {
     uint32_t imageCount;
     uint32_t currentIndex;
     VkRenderPass renderPass;
+    std::vector<VkCommandBuffer> cmdBuffers;
+    std::vector<VkImage> images;
 
    public:
     VulkanWindow(class VulkanContext* _context);
