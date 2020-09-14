@@ -227,6 +227,7 @@ VkResult createInstance(VkInstance& instance, const char* appName) {
 #elif defined(VK_USE_PLATFORM_MACOS_MVK)
     instanceExtensions.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
 #endif
+    instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     VkInstanceCreateInfo instInfo = {};
     instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -427,7 +428,7 @@ void changeLayout(VkCommandBuffer command, VkImage image,
                   VkImageLayout oldLayout, VkImageLayout newLayout,
                   VkPipelineStageFlags oldStageFlags,
                   VkPipelineStageFlags newStageFlags,
-                  VkImageAspectFlags aspectMask) {
+                  VkImageAspectFlags aspectMask, VkAccessFlags newAccessFlags) {
     VkImageMemoryBarrier imageMemoryBarrier = {};
     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageMemoryBarrier.pNext = nullptr;
@@ -476,6 +477,9 @@ void changeLayout(VkCommandBuffer command, VkImage image,
             break;
         default:
             break;
+    }
+    if (newAccessFlags != 0) {
+        imageMemoryBarrier.dstAccessMask != newAccessFlags;
     }
     // 等待命令列表里GPU里处理完成
     vkCmdPipelineBarrier(command, oldStageFlags, newStageFlags, 0, 0, nullptr,

@@ -19,6 +19,7 @@ template class VKX_COMMON_EXPORT std::vector<VkFramebuffer>;
 template class VKX_COMMON_EXPORT std::vector<VkCommandBuffer>;
 template class VKX_COMMON_EXPORT std::unique_ptr<Win32Window>;
 template class VKX_COMMON_EXPORT std::function<void(uint32_t)>;
+template class VKX_COMMON_EXPORT std::function<void()>;
 class VKX_COMMON_EXPORT VulkanWindow {
    private:
     class VulkanContext* context;
@@ -44,7 +45,8 @@ class VKX_COMMON_EXPORT VulkanWindow {
     /** @brief Pipeline stages used to wait at for graphics queue submissions */
     VkPipelineStageFlags submitPipelineStages =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    std::function<void(uint32_t)> onDraw;
+    std::function<void(uint32_t)> onBuildCmd;
+    std::function<void()> onPreDraw;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
     bool bCanDraw = false;
@@ -53,6 +55,7 @@ class VKX_COMMON_EXPORT VulkanWindow {
     VkViewport viewport = {};
     VkRect2D scissor = {};
     VkClearValue clearValues[2];
+    bool resizing = false;
 
    public:
     uint32_t graphicsQueueIndex = UINT32_MAX;
@@ -85,17 +88,14 @@ class VKX_COMMON_EXPORT VulkanWindow {
     void InitSurface(ANativeWindow* window);
 #endif
     void CreateSwipChain(VkDevice _device,
-                         std::function<void(uint32_t)> onDrawAction);
+                         std::function<void(uint32_t)> onBuildCmdAction);
 
-    void Run();
+    void Run(std::function<void()> onPreDrawAction = nullptr);
 
    private:
-    void reSwapChain();
+    void reSwapChainBefore();
+    void reSwapChainAfter();
     void createRenderPass();
-    void createFrameBuffer();
-
-    void beginFrame();
-    void endFrame();
 };
 }  // namespace common
 }  // namespace vkx

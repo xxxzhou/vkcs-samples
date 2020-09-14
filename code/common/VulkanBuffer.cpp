@@ -81,5 +81,28 @@ void VulkanBuffer::InitResource(class VulkanContext* context, uint32_t dataSize,
     descInfo.offset = 0;
     descInfo.range = dataSize;
 }
+
+void VulkanBuffer::AddBarrier(VkCommandBuffer command,
+                                VkPipelineStageFlags newStageFlags,
+                                VkAccessFlags newAccessFlags) {
+    VkPipelineStageFlags oldStageFlags = stageFlags;
+    VkAccessFlags oldAccessFlags = accessFlags;
+
+    VkBufferMemoryBarrier bufBarrier = {};
+    bufBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+
+    bufBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bufBarrier.buffer = buffer;
+    bufBarrier.offset = 0;
+    bufBarrier.size = VK_WHOLE_SIZE;
+    bufBarrier.srcAccessMask = oldAccessFlags;
+    bufBarrier.dstAccessMask = newAccessFlags;
+    vkCmdPipelineBarrier(command, oldStageFlags, newStageFlags, 0, 0, nullptr,
+                         1, &bufBarrier, 0, nullptr);
+    stageFlags = newStageFlags;
+    accessFlags = newAccessFlags;
+}
+
 }  // namespace common
 }  // namespace vkx

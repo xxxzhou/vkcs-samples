@@ -3,7 +3,11 @@ namespace vkx {
 namespace common {
 VulkanContext::VulkanContext(/* args */) {}
 
-VulkanContext::~VulkanContext() {}
+VulkanContext::~VulkanContext() {
+    if (pipelineCache) {
+        vkDestroyPipelineCache(logicalDevice.device, pipelineCache, nullptr);
+    }    
+}
 
 void VulkanContext::CreateInstance(const char* appName) {
     createInstance(instace, appName);
@@ -17,16 +21,30 @@ void VulkanContext::CreateDevice(uint32_t graphicsIndex, bool bAloneCompute) {
     // 创建虚拟设备
     createLogicalDevice(logicalDevice, physicalDevice, graphicsIndex,
                         bAloneCompute);
+    this->bAloneCompute =
+        logicalDevice.computeIndex != logicalDevice.graphicsIndex;
     vkGetDeviceQueue(logicalDevice.device, logicalDevice.computeIndex, 0,
                      &computeQueue);
     vkGetDeviceQueue(logicalDevice.device, logicalDevice.graphicsIndex, 0,
                      &graphicsQueue);
-    VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
-    pipelineCacheCreateInfo.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    VK_CHECK_RESULT(vkCreatePipelineCache(logicalDevice.device,
-                                          &pipelineCacheCreateInfo, nullptr,
-                                          &pipelineCache));
+    //
+    VkPipelineCacheCreateInfo pipelineCacheInfo = {};
+    pipelineCacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+    VK_CHECK_RESULT(vkCreatePipelineCache(
+        logicalDevice.device, &pipelineCacheInfo, nullptr, &pipelineCache));
+    // context和呈现渲染相应command分开
+    VkCommandPoolCreateInfo cmdPoolInfo = {};
+    cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmdPoolInfo.queueFamilyIndex = logicalDevice.computeIndex;
+    cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VK_CHECK_RESULT(vkCreateCommandPool(logicalDevice.device, &cmdPoolInfo,
+                                        nullptr, &cmdPool));
+    VkCommandBufferAllocateInfo cmdBufInfo = {};
+    cmdBufInfo.commandPool = cmdPool;
+    cmdBufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBufInfo.commandBufferCount = 1;
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(logicalDevice.device, &cmdBufInfo,
+                                             &computerCmd));
 }
 
 bool VulkanContext::CheckFormat(VkFormat format, VkFormatFeatureFlags feature,
@@ -57,7 +75,7 @@ void VulkanContext::BufferToImage(VkCommandBuffer cmd,
     copyRegion.imageExtent.height = texture->height;
     copyRegion.imageExtent.depth = 1;
 
-    /* Put the copy command into the command buffer */
+    // buffer to image
     vkCmdCopyBufferToImage(cmd, buffer->buffer, texture->image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                            &copyRegion);

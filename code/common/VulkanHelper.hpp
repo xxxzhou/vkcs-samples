@@ -70,12 +70,12 @@ VKX_COMMON_EXPORT VkShaderModule loadShader(const char* fileName,
                                             VkDevice device);
 #endif
 
-VKX_COMMON_EXPORT void changeLayout(VkCommandBuffer command, VkImage image,
-                                    VkImageLayout oldLayout,
-                                    VkImageLayout newLayout,
-                                    VkPipelineStageFlags oldStageFlags,
-                                    VkPipelineStageFlags newStageFlags,
-                                    VkImageAspectFlags aspectMask);
+VKX_COMMON_EXPORT void changeLayout(
+    VkCommandBuffer command, VkImage image, VkImageLayout oldLayout,
+    VkImageLayout newLayout, VkPipelineStageFlags oldStageFlags,
+    VkPipelineStageFlags newStageFlags,
+    VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    VkAccessFlags newAccessFlags = 0);
 
 }  // namespace common
 }  // namespace vkx

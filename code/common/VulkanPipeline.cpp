@@ -117,7 +117,7 @@ void UBOLayout::GenerateLayout() {
 }
 
 void UBOLayout::UpdateSetLayout(uint32_t groupIndex, uint32_t setIndex, ...) {
-    assert(groupIndex > 0 && groupIndex < items.size());
+    assert(groupIndex >= 0 && groupIndex < items.size());
     va_list args;
     va_start(args, setIndex);
     auto& descSet = descSets[groupIndex][setIndex];

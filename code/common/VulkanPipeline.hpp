@@ -59,11 +59,11 @@ class VKX_COMMON_EXPORT UBOLayout {
     VkDescriptorPool descPool;
     // 根据groupIndex分组生成不同VkDescriptorSetLayout
     std::vector<VkDescriptorSetLayout> descSetLayouts;
-    // 根据layout生成不同的
-    std::vector<std::vector<VkDescriptorSet>> descSets;
 
    public:
     VkPipelineLayout pipelineLayout = nullptr;
+    // 根据layout生成不同的
+    std::vector<std::vector<VkDescriptorSet>> descSets;
 
    public:
     // 一个layout表示一个VkDescriptorSetLayout,shader上的一个set,layout里面索引对应binding
@@ -80,7 +80,7 @@ class VKX_COMMON_EXPORT VulkanPipeline {
    public:
     VulkanPipeline(/* args */);
     ~VulkanPipeline();
-   
+
    public:
     // 创建一个默认状态的管线
     static void CreateDefaultFixPipelineState(FixPipelineState& fixState);
@@ -90,7 +90,7 @@ class VKX_COMMON_EXPORT VulkanPipeline {
         VkShaderStageFlagBits stage);
 
     static VkComputePipelineCreateInfo CreateComputePipelineInfo(
-        VkPipelineLayout layout,VkPipelineShaderStageCreateInfo stageInfo);
+        VkPipelineLayout layout, VkPipelineShaderStageCreateInfo stageInfo);
 };
 }  // namespace common
 }  // namespace vkx

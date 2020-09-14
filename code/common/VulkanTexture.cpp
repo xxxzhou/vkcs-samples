@@ -34,9 +34,11 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
     this->format = format;
     // 重新初始化
     layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    accessFlags = 0;
     if (!bGpu) {
         // 初始化只能UNDEFINED/PREINITIALIZED,PREINITIALIZED可以用内存数据初始化
         layout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+        accessFlags = VK_ACCESS_HOST_WRITE_BIT;
     }
     stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     // SRV,UVA资源一般不支持LINEAR格式,LINEAR限制较大,请先检查是否支持相应UsageFlag
@@ -148,27 +150,27 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
     VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &view));
-
-    descInfo.imageLayout = layout;
-    descInfo.imageView = view;
-    descInfo.sampler = sampler;
 }
 
-void VulkanTexture::ChangeLayout(VkCommandBuffer command,
-                                 VkImageLayout newLayout,
-                                 VkPipelineStageFlags newStageFlags) {
-    // 这段逻辑要考虑下,可能只是想插入一个Barrier
-    if (layout == newLayout && stageFlags == newStageFlags) {
-        return;
-    }
+void VulkanTexture::AddBarrier(VkCommandBuffer command, VkImageLayout newLayout,
+                               VkPipelineStageFlags newStageFlags,
+                               VkAccessFlags newAccessFlags) {
     VkImageLayout oldLayout = layout;
     VkPipelineStageFlags oldStageFlags = stageFlags;
 
     changeLayout(command, image, oldLayout, newLayout, oldStageFlags,
-                 newStageFlags, VK_IMAGE_ASPECT_COLOR_BIT);
+                 newStageFlags, VK_IMAGE_ASPECT_COLOR_BIT, newAccessFlags);
     layout = newLayout;
     stageFlags = newStageFlags;
+    accessFlags = newAccessFlags;
+}
+
+VkDescriptorImageInfo VulkanTexture::GetDescInfo(VkImageLayout layout) {
+    VkDescriptorImageInfo descInfo;
     descInfo.imageLayout = layout;
+    descInfo.imageView = view;
+    descInfo.sampler = sampler;
+    return descInfo;
 }
 
 }  // namespace common

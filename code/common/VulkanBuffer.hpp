@@ -20,11 +20,14 @@ enum BufferUsage {
 // memory与view的关系应该是一对多,本类专门用于UBO,表示一块容易每桢修改的块
 // 后期专门设计一个memory对应多个view的类。(可以一个mesh的IBO,VBO放一起,也可多Mesh放一块)
 class VKX_COMMON_EXPORT VulkanBuffer {
-   private:    
+   private:
     VkDeviceMemory memory;
     VkDevice device;
     VkBufferView view;
     VkDescriptorBufferInfo descInfo;
+    VkPipelineStageFlags stageFlags =
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;  // VK_PIPELINE_STAGE_HOST_BIT;
+    VkAccessFlags accessFlags = VK_ACCESS_HOST_WRITE_BIT;
 
    public:
     VulkanBuffer();
@@ -38,6 +41,10 @@ class VKX_COMMON_EXPORT VulkanBuffer {
                       VkFormat viewFormat, VkBufferUsageFlags usageFlag,
                       VkMemoryPropertyFlags memoryFlag,
                       uint8_t* cpuData = nullptr);
+    // Computer shader后,插入相关barrier,由读变写,由写变读,确保前面操作完成
+    // 后续添加渲染管线与计算管线添加barrier的逻辑
+    void AddBarrier(VkCommandBuffer command, VkPipelineStageFlags newStageFlags,
+                    VkAccessFlags newAccessFlags);
 };
 }  // namespace common
 }  // namespace vkx

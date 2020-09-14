@@ -36,8 +36,8 @@ VulkanWindow::~VulkanWindow() {
 }
 
 #if defined(_WIN32)
-void VulkanWindow::InitWindow(HINSTANCE inst, uint32_t _width,
-                                 uint32_t _height, const char* appName) {
+void VulkanWindow::InitWindow(HINSTANCE inst, uint32_t _width, uint32_t _height,
+                              const char* appName) {
     this->width = _width;
     this->height = _height;
     // 创建窗口
@@ -50,25 +50,19 @@ void VulkanWindow::InitWindow(HINSTANCE inst, uint32_t _width,
 LRESULT VulkanWindow::handleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
         case WM_SIZE: {
-            this->width = LOWORD(lparam);
-            this->height = HIWORD(lparam);
-            if (device && swapChain) {
+            if (device && swapChain && resizing) {
                 vkDeviceWaitIdle(device);
-                // 重新创建
-                this->reSwapChain();
-                //重新创建frameBuffer
-                for (uint32_t i = 0; i < frameBuffers.size(); i++) {
-                    vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
-                }
-                frameBuffers.clear();
-                this->createFrameBuffer();
-                //更新
-                renderPassBeginInfo.renderArea.extent = {width, height};
-                viewport.width = width;
-                viewport.height = height;
-                scissor.extent = {width, height};
+                // 得到imagecount
+                this->reSwapChainBefore();
+                this->reSwapChainAfter();
             }
         } break;
+        case WM_ENTERSIZEMOVE:
+            resizing = true;
+            break;
+        case WM_EXITSIZEMOVE:
+            resizing = false;
+            break;
         case WM_DESTROY:
             PostQuitMessage(0);
             break;
@@ -150,22 +144,22 @@ void VulkanSwapChain::InitSurface(ANativeWindow* window)
 }
 
 void VulkanWindow::CreateSwipChain(
-    VkDevice _device, std::function<void(uint32_t)> onDrawAction) {
+    VkDevice _device, std::function<void(uint32_t)> onBuildCmdAction) {
     this->device = _device;
-    this->onDraw = onDrawAction;
+    this->onBuildCmd = onBuildCmdAction;
     // 创建semaphore 与 submitInfo,同步渲染与命令执行的顺序
-    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkSemaphoreCreateInfo semaphoreInfo = {};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     // 确保显示图像后再提交渲染命令,vkAcquireNextImageKHR用来presentComplete使presentComplete上锁
-    VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
-                                      &presentComplete));
+    VK_CHECK_RESULT(
+        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &presentComplete));
     // 确保提交与执行命令后,才能执行显示图像
-    VK_CHECK_RESULT(vkCreateSemaphore(device, &semaphoreCreateInfo, nullptr,
-                                      &renderComplete));
+    VK_CHECK_RESULT(
+        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderComplete));
     // 创建cpu-gpu通知
     VkFenceCreateInfo fenceInfo = {};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    // 默认是有信息
+    // 默认是有信号
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     vkCreateFence(device, &fenceInfo, nullptr, &presentFence);
     // 用于渲染队列里确定等待与发送信号
@@ -177,8 +171,6 @@ void VulkanWindow::CreateSwipChain(
     submitInfo.signalSemaphoreCount = 1;
     // 用于缓冲命令执行结束后发出信号的信号量对象
     submitInfo.pSignalSemaphores = &renderComplete;
-    // 创建swapchain以及对应的image
-    this->reSwapChain();
     // 得到当前使用的queue
     vkGetDeviceQueue(device, graphicsQueueIndex, 0, &graphicsQueue);
     if (graphicsQueueIndex == presentQueueIndex) {
@@ -193,47 +185,30 @@ void VulkanWindow::CreateSwipChain(
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     VK_CHECK_RESULT(
         vkCreateCommandPool(device, &cmdPoolInfo, nullptr, &cmdPool));
+    // 创建窗口用的renderpass
+    this->createRenderPass();
+    // 得到imagecount
+    this->reSwapChainBefore();
     // imageCount一般来说不会变动
     cmdBuffers.resize(imageCount);
     VkCommandBufferAllocateInfo cmdBufInfo = {};
     cmdBufInfo.commandPool = cmdPool;
     cmdBufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdBufInfo.commandBufferCount = cmdBuffers.size();
+    cmdBufInfo.commandBufferCount = (uint32_t)cmdBuffers.size();
     VK_CHECK_RESULT(
         vkAllocateCommandBuffers(device, &cmdBufInfo, cmdBuffers.data()));
-    // 创建窗口用的renderpass
-    this->createRenderPass();
-    // 创建窗口需要的framebuffer
-    this->createFrameBuffer();
-    // 创建cmdBufferBeginInfo
-    cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    // 创建renderpassbeginInfo
-    // VkClearValue clearValues[2];
-    clearValues[0].color = {{0.0f, 1.0f, 0.0f, 1.0f}};
-    clearValues[1].depthStencil = {1.0f, 0};
-    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassBeginInfo.renderPass = renderPass;
-    renderPassBeginInfo.renderArea.extent = {width, height};
-    renderPassBeginInfo.clearValueCount = 2;
-    renderPassBeginInfo.pClearValues = clearValues;
-    // viewport
-    viewport.width = (float)width;
-    viewport.height = (float)height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-    // scissor
-    scissor.extent = {width, height};
-    scissor.offset = {0, 0};
+    // 创建swapchain以及对应的image
+    this->reSwapChainAfter();
 }
 
-void VulkanWindow::reSwapChain() {
+void VulkanWindow::reSwapChainBefore() {
     this->bCanDraw = false;
     VkSwapchainKHR oldSwapchain = swapChain;
     // Get physical device surface properties and formats
     VkSurfaceCapabilitiesKHR surfCapabilities;
     VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
         physicalDevice, surface, &surfCapabilities));
-
+    // 得到交换链支持的所有Mode
     uint32_t presentModeCount;
     VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(
         physicalDevice, surface, &presentModeCount, nullptr));
@@ -266,6 +241,7 @@ void VulkanWindow::reSwapChain() {
         // If the surface size is defined, the swap chain size must match
         swapchainExtent = surfCapabilities.currentExtent;
     }
+    // 得到交换链要求的长宽,surface大小变动后,要重新获得
     this->width = swapchainExtent.width;
     this->height = swapchainExtent.height;
     // present需要支持FIFO
@@ -344,14 +320,16 @@ void VulkanWindow::reSwapChain() {
     }
     VK_CHECK_RESULT(
         vkCreateSwapchainKHR(device, &swapchainInfo, nullptr, &swapChain));
-    // depth
+    // 自动销毁老的资源,重新生成
     depthTex = std::make_unique<VulkanTexture>();
     depthTex->InitResource(context, width, height, depthFormat,
                            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    // 销毁老的资源
     if (oldSwapchain != VK_NULL_HANDLE) {
         for (uint32_t i = 0; i < imageCount; i++) {
             vkDestroyImageView(device, views[i], nullptr);
+            vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
         }
         vkDestroySwapchainKHR(device, oldSwapchain, nullptr);
     }
@@ -360,27 +338,82 @@ void VulkanWindow::reSwapChain() {
     images.resize(imageCount);
     VK_CHECK_RESULT(
         vkGetSwapchainImagesKHR(device, swapChain, &imageCount, images.data()));
+}
+
+void VulkanWindow::reSwapChainAfter() {
     views.resize(imageCount);
     frameBuffers.resize(imageCount);
+    // 创建swap image view
+    VkImageViewCreateInfo colorAttachmentView = {};
+    colorAttachmentView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    colorAttachmentView.pNext = nullptr;
+    colorAttachmentView.format = format;
+    colorAttachmentView.components = {
+        VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B,
+        VK_COMPONENT_SWIZZLE_A};
+    colorAttachmentView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorAttachmentView.subresourceRange.baseMipLevel = 0;
+    colorAttachmentView.subresourceRange.levelCount = 1;
+    colorAttachmentView.subresourceRange.baseArrayLayer = 0;
+    colorAttachmentView.subresourceRange.layerCount = 1;
+    colorAttachmentView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    colorAttachmentView.flags = 0;
+
+    VkImageView attachments[2];
+    attachments[1] = depthTex->view;
+    // 创建FBO
+    VkFramebufferCreateInfo frameBufferCreateInfo = {};
+    frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    frameBufferCreateInfo.pNext = NULL;
+    frameBufferCreateInfo.renderPass = renderPass;
+    frameBufferCreateInfo.attachmentCount = 2;
+    // 需要满足renderpass创建指定的VkAttachmentDescription
+    frameBufferCreateInfo.pAttachments = attachments;
+    frameBufferCreateInfo.width = width;
+    frameBufferCreateInfo.height = height;
+    frameBufferCreateInfo.layers = 1;
     for (uint32_t i = 0; i < imageCount; i++) {
-        VkImageViewCreateInfo colorAttachmentView = {};
-        colorAttachmentView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        colorAttachmentView.pNext = nullptr;
-        colorAttachmentView.format = format;
-        colorAttachmentView.components = {
-            VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
-            VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
-        colorAttachmentView.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_COLOR_BIT;
-        colorAttachmentView.subresourceRange.baseMipLevel = 0;
-        colorAttachmentView.subresourceRange.levelCount = 1;
-        colorAttachmentView.subresourceRange.baseArrayLayer = 0;
-        colorAttachmentView.subresourceRange.layerCount = 1;
-        colorAttachmentView.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        colorAttachmentView.flags = 0;
         colorAttachmentView.image = images[i];
         VK_CHECK_RESULT(vkCreateImageView(device, &colorAttachmentView, nullptr,
                                           &views[i]));
+        attachments[0] = views[i];
+        VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCreateInfo,
+                                            nullptr, &frameBuffers[i]));
+    }
+    //因大小变化,重新组合相应buffer
+    // 创建cmdBufferBeginInfo
+    cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    // 创建renderpassbeginInfo
+    // VkClearValue clearValues[2];
+    clearValues[0].color = {{0.0f, 1.0f, 0.0f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
+    renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassBeginInfo.renderPass = renderPass;
+    renderPassBeginInfo.renderArea.extent = {width, height};
+    renderPassBeginInfo.clearValueCount = 2;
+    renderPassBeginInfo.pClearValues = clearValues;
+    // viewport
+    viewport.width = (float)width;
+    viewport.height = (float)height;
+    viewport.minDepth = 0.f;
+    viewport.maxDepth = 1.f;
+    // scissor
+    scissor.extent = {width, height};
+    scissor.offset = {0, 0};
+    // 开始组合build
+    for (uint32_t i = 0; i < imageCount; i++) {
+        vkBeginCommandBuffer(cmdBuffers[i], &cmdBufferBeginInfo);
+        vkCmdSetViewport(cmdBuffers[i], 0, 1, &viewport);
+        vkCmdSetScissor(cmdBuffers[i], 0, 1, &scissor);
+        renderPassBeginInfo.framebuffer = frameBuffers[i];
+        // renderpass关联渲染目标
+        vkCmdBeginRenderPass(cmdBuffers[i], &renderPassBeginInfo,
+                             VK_SUBPASS_CONTENTS_INLINE);
+        if (onBuildCmd) {
+            onBuildCmd(i);
+        }
+        vkCmdEndRenderPass(cmdBuffers[i]);
+        vkEndCommandBuffer(cmdBuffers[i]);
     }
     this->bCanDraw = true;
 }
@@ -462,45 +495,8 @@ void VulkanWindow::createRenderPass() {
         vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
 }
 
-void VulkanWindow::createFrameBuffer() {
-    VkImageView attachments[2];
-    // Depth/Stencil attachment is the same for all frame buffers
-    attachments[1] = depthTex->view;
-    VkFramebufferCreateInfo frameBufferCreateInfo = {};
-    frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    frameBufferCreateInfo.pNext = NULL;
-    frameBufferCreateInfo.renderPass = renderPass;
-    frameBufferCreateInfo.attachmentCount = 2;
-    // 需要满足renderpass创建指定的VkAttachmentDescription
-    frameBufferCreateInfo.pAttachments = attachments;
-    frameBufferCreateInfo.width = width;
-    frameBufferCreateInfo.height = height;
-    frameBufferCreateInfo.layers = 1;
-    // Create frame buffers for every swap chain image
-    frameBuffers.resize(imageCount);
-    for (uint32_t i = 0; i < frameBuffers.size(); i++) {
-        attachments[0] = views[i];
-        VK_CHECK_RESULT(vkCreateFramebuffer(device, &frameBufferCreateInfo,
-                                            nullptr, &frameBuffers[i]));
-    }
-}
-
-void VulkanWindow::beginFrame() {
-    vkBeginCommandBuffer(cmdBuffers[currentIndex], &cmdBufferBeginInfo);
-    vkCmdSetViewport(cmdBuffers[currentIndex], 0, 1, &viewport);
-    vkCmdSetScissor(cmdBuffers[currentIndex], 0, 1, &scissor);
-    renderPassBeginInfo.framebuffer = frameBuffers[currentIndex];
-    // renderpass关联渲染目标
-    vkCmdBeginRenderPass(cmdBuffers[currentIndex], &renderPassBeginInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
-}
-
-void VulkanWindow::endFrame() {
-    vkCmdEndRenderPass(cmdBuffers[currentIndex]);
-    vkEndCommandBuffer(cmdBuffers[currentIndex]);
-}
-
-void VulkanWindow::Run() {
+void VulkanWindow::Run(std::function<void()> onPreDrawAction) {
+    this->onPreDraw = onPreDrawAction;
 #if defined(_WIN32)
     while (true) {
         bool quit = false;
@@ -516,8 +512,11 @@ void VulkanWindow::Run() {
         if (quit) {
             break;
         }
-        if (bCanDraw && onDraw) {
-            // // 等待开门,默认门是开的
+        if (onPreDraw) {
+            onPreDraw();
+        }
+        if (bCanDraw) {
+            // // 等待开门,前面设置默认门是开的
             // VK_CHECK_RESULT(
             //     vkWaitForFences(device, 1, &presentFence, true, UINT64_MAX));
             // // 关门 VkFence不同于VkSemaphore,需要手动reset.
@@ -526,11 +525,6 @@ void VulkanWindow::Run() {
             VkResult result = vkAcquireNextImageKHR(
                 device, swapChain, UINT64_MAX, presentComplete,
                 (VkFence) nullptr, &currentIndex);
-            if (result == VK_SUCCESS) {
-                beginFrame();
-                onDraw(currentIndex);
-                endFrame();
-            }
             // 提交缓冲区命令,执行完后发送信号给renderComplete
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &cmdBuffers[currentIndex];

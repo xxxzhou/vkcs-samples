@@ -6,8 +6,6 @@ file(GLOB scr_paths "*.cpp" "*.hpp" "*.h")
 message(STATUS "xxxx-" ${scr_paths})
 file(GLOB glsl_sources "*.comp" "*.hlsl")
 
-glsl_to_spirv("cs1.comp")
-
 # 生成运行程序
 message(STATUS "xxxx-" ${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})

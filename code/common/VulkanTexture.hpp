@@ -17,10 +17,10 @@ class VKX_COMMON_EXPORT VulkanTexture {
     // image可能创建多个mipmap,多层级图像,view针对具体
     VkImageView view;
     VkImage image;
-    VkDescriptorImageInfo descInfo;
     // 这二个可以get出去,不能直接修改
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkAccessFlags accessFlags = VK_ACCESS_HOST_WRITE_BIT;
 
    public:
     VulkanTexture();
@@ -33,8 +33,12 @@ class VKX_COMMON_EXPORT VulkanTexture {
                       VkMemoryPropertyFlags memoryFlag,
                       uint8_t* cpuData = nullptr, uint8_t cpuPitch = 0);
 
-    void ChangeLayout(VkCommandBuffer command, VkImageLayout newLayout,
-                      VkPipelineStageFlags newStageFlags);
+    void AddBarrier(VkCommandBuffer command, VkImageLayout newLayout,
+                    VkPipelineStageFlags newStageFlags,
+                    VkAccessFlags newAccessFlags = 0);
+
+    // VkDescriptorImageInfo需要在渲染命令列表中确定,而初始化要求比较早
+    VkDescriptorImageInfo GetDescInfo(VkImageLayout layout);
 };
 }  // namespace common
 }  // namespace vkx
