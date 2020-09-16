@@ -10,15 +10,22 @@
 #include <windows.h>
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/asset_manager.h>
+#include <android/log.h>
 #include <android/native_activity.h>
 #include <android_native_app_glue.h>
 #include <sys/system_properties.h>
+
+#include "android/vulkan_wrapper.h"
 #endif
 
+#ifdef _WIN32
 #if defined(VKX_COMMON_EXPORT_DEFINE)
 #define VKX_COMMON_EXPORT __declspec(dllexport)
 #else
 #define VKX_COMMON_EXPORT __declspec(dllimport)
+#endif
+#else
+#define VKX_COMMON_EXPORT
 #endif
 
 namespace vkx {

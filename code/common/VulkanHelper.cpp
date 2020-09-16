@@ -227,7 +227,10 @@ VkResult createInstance(VkInstance& instance, const char* appName) {
 #elif defined(VK_USE_PLATFORM_MACOS_MVK)
     instanceExtensions.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
 #endif
+
+#if defined(_WIN32)
     instanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
 
     VkInstanceCreateInfo instInfo = {};
     instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -423,6 +426,7 @@ VkShaderModule loadShader(const char* fileName, VkDevice device) {
         return VK_NULL_HANDLE;
     }
 }
+#endif
 
 void changeLayout(VkCommandBuffer command, VkImage image,
                   VkImageLayout oldLayout, VkImageLayout newLayout,
@@ -485,8 +489,6 @@ void changeLayout(VkCommandBuffer command, VkImage image,
     vkCmdPipelineBarrier(command, oldStageFlags, newStageFlags, 0, 0, nullptr,
                          0, nullptr, 1, &imageMemoryBarrier);
 }
-
-#endif
 
 }  // namespace common
 }  // namespace vkx

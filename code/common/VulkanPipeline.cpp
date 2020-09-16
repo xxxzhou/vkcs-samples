@@ -34,7 +34,7 @@ UBOLayout::~UBOLayout() {
 int32_t UBOLayout::AddSetLayout(std::vector<UBOLayoutItem> layout,
                                 uint32_t count) {
     items.push_back(layout);
-    groupSize.push_back(max(1, count));
+    groupSize.push_back(count > 1 ? count : 1);
     return items.size() - 1;
 }
 
@@ -239,12 +239,15 @@ void VulkanPipeline::CreateDefaultFixPipelineState(FixPipelineState& fix) {
         (uint32_t)fix.dynamicStateEnables.size();
 }
 VkPipelineShaderStageCreateInfo VulkanPipeline::LoadShader(
+#if __ANDROID__
+    AAssetManager* assetManager,
+#endif
     VkDevice device, const std::string& fileName, VkShaderStageFlagBits stage) {
     VkPipelineShaderStageCreateInfo shaderStage = {};
     shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStage.stage = stage;
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-    shaderStage.module = loadShader(androidApp->activity->assetManager,
+#if defined(__ANDROID__)
+    shaderStage.module = loadShader(assetManager,
                                     fileName.c_str(), device);
 #else
     shaderStage.module = loadShader(fileName.c_str(), device);

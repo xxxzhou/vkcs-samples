@@ -1,12 +1,24 @@
 #include "VulkanContext.hpp"
+
 namespace vkx {
 namespace common {
-VulkanContext::VulkanContext(/* args */) {}
+VulkanContext::VulkanContext(/* args */) {
+#ifdef __ANDROID__
+    // This place is the first place for samples to use Vulkan APIs.
+    // Here, we are going to open Vulkan.so on the device and retrieve function
+    // pointers using vulkan_wrapper helper.
+    if (!InitVulkan()) {
+        LOGE("Failied initializing Vulkan APIs!");
+        return;
+    }
+    LOGI("Loaded Vulkan APIs.");
+#endif
+}
 
 VulkanContext::~VulkanContext() {
     if (pipelineCache) {
         vkDestroyPipelineCache(logicalDevice.device, pipelineCache, nullptr);
-    }    
+    }
 }
 
 void VulkanContext::CreateInstance(const char* appName) {

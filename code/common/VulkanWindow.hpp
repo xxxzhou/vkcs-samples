@@ -1,10 +1,13 @@
 #pragma once
+
 #include <memory>
 
 #include "VulkanCommon.hpp"
 #include "VulkanTexture.hpp"
 #if WIN32
 #include "WIN32/Win32Window.hpp"
+#elif __ANDROID__
+#include <android/native_window_jni.h>
 #endif
 #include <functional>
 
@@ -12,6 +15,7 @@
 
 namespace vkx {
 namespace common {
+#if WIN32
 template class VKX_COMMON_EXPORT std::unique_ptr<VulkanTexture>;
 template class VKX_COMMON_EXPORT std::vector<VkImage>;
 template class VKX_COMMON_EXPORT std::vector<VkImageView>;
@@ -20,6 +24,8 @@ template class VKX_COMMON_EXPORT std::vector<VkCommandBuffer>;
 template class VKX_COMMON_EXPORT std::unique_ptr<Win32Window>;
 template class VKX_COMMON_EXPORT std::function<void(uint32_t)>;
 template class VKX_COMMON_EXPORT std::function<void()>;
+#endif
+
 class VKX_COMMON_EXPORT VulkanWindow {
    private:
     class VulkanContext* context;
@@ -34,6 +40,8 @@ class VKX_COMMON_EXPORT VulkanWindow {
     std::vector<VkFramebuffer> frameBuffers;
 #if defined(_WIN32)
     std::unique_ptr<Win32Window> window;
+#elif defined(__ANDROID__)
+    android_app* androidApp;
 #endif
     // 用于通知CPU,GPU上图像已经呈现出来
     VkFence presentFence;
@@ -70,6 +78,7 @@ class VKX_COMMON_EXPORT VulkanWindow {
     VkRenderPass renderPass;
     std::vector<VkCommandBuffer> cmdBuffers;
     std::vector<VkImage> images;
+    bool focused = false;
 
    public:
     VulkanWindow(class VulkanContext* _context);
@@ -85,7 +94,7 @@ class VKX_COMMON_EXPORT VulkanWindow {
 #if defined(_WIN32)
     void InitSurface(HINSTANCE inst, HWND windowHandle);
 #elif defined(__ANDROID__)
-    void InitSurface(ANativeWindow* window);
+    void InitSurface(android_app* app);
 #endif
     void CreateSwipChain(VkDevice _device,
                          std::function<void(uint32_t)> onBuildCmdAction);
@@ -96,6 +105,8 @@ class VKX_COMMON_EXPORT VulkanWindow {
     void reSwapChainBefore();
     void reSwapChainAfter();
     void createRenderPass();
+
+    void tick();
 };
 }  // namespace common
 }  // namespace vkx

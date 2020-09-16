@@ -4,12 +4,19 @@
 #include <memory>
 #include <string>
 
-#include "cs1.comp.h"
 // int main(int argc, char *argv[]) {
 //     char sample_title[] = "Compute shader Sample";
 
 //     return 0;
 // }
+
+#ifdef __ANDROID__
+#include <android/native_activity.h>
+#include <android_native_app_glue.h>
+
+#include "errno.h"
+static android_app *androidApp = nullptr;
+#endif
 
 using namespace vkx::common;
 
@@ -98,19 +105,29 @@ void onPreCommand(uint32_t index) {
                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 }
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
-    const char* title = "vkcs1";
+#if _WIN32
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+#else __ANDROID__
+void android_main(struct android_app *app)
+#endif
+{
+    const char *title = "vkcs1";
     context = std::make_unique<VulkanContext>();
     context->CreateInstance(title);
     window = std::make_unique<VulkanWindow>(context.get());
+#if _WIN32
     window->InitWindow(hInstance, 1280, 720, title);
+#else __ANDROID__
+    // Forward cout/cerr to logcat.
+    // std::cout.rdbuf(new AndroidBuffer(ANDROID_LOG_INFO));
+    // std::cerr.rdbuf(new AndroidBuffer(ANDROID_LOG_ERROR));
+    window->InitSurface(app);
+#endif
     context->CreateDevice(window->graphicsQueueIndex);
-
     VulkanPipeline::CreateDefaultFixPipelineState(fixState);
-
     int32_t size = width * height * 4;
     std::vector<uint8_t> vdata(size, 0);
-    uint8_t* data = vdata.data();
+    uint8_t *data = vdata.data();
     for (int row = 0; row < height; row++) {
         for (int col = 0; col < width; col++) {
             unsigned char rgb = (((row & 0x8) == 0) ^ ((col & 0x8) == 0)) * 255;
@@ -156,12 +173,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
     layout->UpdateSetLayout(0, 0,
                             csSrcTex->GetDescInfo(VK_IMAGE_LAYOUT_GENERAL),
                             csDestTex->GetDescInfo(VK_IMAGE_LAYOUT_GENERAL));
-
-    // getAssetPath() + "glsl/cs1.comp.spv"
+#if _WIN32
     const std::string path =
-        "D:/WorkSpace/github/vkcs-samples/code/data/glsl/cs1.comp.spv";
+        "D:/WorkSpace/github/vkcs-samples/code/data/hlsl/cs1.comp.spv";
+#elif __ANDROID__
+    const std::string path = getAssetPath() + "hlsl/cs1.comp.spv";
+#endif
 
     auto shaderInfo = VulkanPipeline::LoadShader(
+#if __ANDROID__
+        app->activity->assetManager,
+#endif
         context->logicalDevice.device, path, VK_SHADER_STAGE_COMPUTE_BIT);
     auto computePipelineInfo = VulkanPipeline::CreateComputePipelineInfo(
         layout->pipelineLayout, shaderInfo);

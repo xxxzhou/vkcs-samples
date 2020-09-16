@@ -1,10 +1,13 @@
 package vulkan.samples.vkcs1;
 
-import android.support.v7.app.AppCompatActivity;
+import android.app.NativeActivity;
 import android.os.Bundle;
 
-public class MainActivity extends AppCompatActivity {
-
+public class MainActivity extends NativeActivity {
+    static {
+        // Load native library
+        // System.loadLibrary("vkcs1");
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

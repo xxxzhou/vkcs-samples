@@ -72,13 +72,40 @@ LRESULT VulkanWindow::handleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
     }
     return 0;
 }
-
+#elif __ANDROID__
+void handleAppCommand(android_app* app, int32_t cmd) {
+    assert(app->userData != NULL);
+    VulkanWindow* window = reinterpret_cast<VulkanWindow*>(app->userData);
+    switch (cmd) {
+        case APP_CMD_INIT_WINDOW:
+            // The window is being shown, get it ready.
+            LOGI("\n");
+            LOGI("=================================================");
+            LOGI("          The sample ran successfully!!");
+            LOGI("=================================================");
+            LOGI("\n");
+            break;
+        case APP_CMD_TERM_WINDOW:
+            // The window is being hidden or closed, clean it up.
+            break;
+        case APP_CMD_LOST_FOCUS:
+            LOGI("APP_CMD_LOST_FOCUS");
+            window->focused = false;
+            break;
+        case APP_CMD_GAINED_FOCUS:
+            LOGI("APP_CMD_GAINED_FOCUS");
+            window->focused = true;
+            break;
+        default:
+            LOGI("event not handled: %d", cmd);
+    }
+}
 #endif
 
 #if defined(_WIN32)
 void VulkanWindow::InitSurface(HINSTANCE inst, HWND windowHandle)
 #elif defined(__ANDROID__)
-void VulkanSwapChain::InitSurface(ANativeWindow* window)
+void VulkanWindow::InitSurface(android_app* app)
 #endif
 {
     VkResult ret = VK_SUCCESS;
@@ -90,9 +117,12 @@ void VulkanSwapChain::InitSurface(ANativeWindow* window)
     VK_CHECK_RESULT(vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo,
                                             nullptr, &surface));
 #elif defined(__ANDROID__)
+    this->androidApp = app;
+    this->androidApp->userData = this;
+    this->androidApp->onAppCmd = handleAppCommand;
     VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-    surfaceCreateInfo.window = window;
+    surfaceCreateInfo.window = app->window;
     VK_CHECK_RESULT(vkCreateAndroidSurfaceKHR(instance, &surfaceCreateInfo,
                                               NULL, &surface));
 #endif
@@ -495,6 +525,45 @@ void VulkanWindow::createRenderPass() {
         vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass));
 }
 
+void VulkanWindow::tick() {
+    if (onPreDraw) {
+        onPreDraw();
+    }
+    if (bCanDraw) {
+        // // 等待开门,前面设置默认门是开的
+        // VK_CHECK_RESULT(
+        //     vkWaitForFences(device, 1, &presentFence, true, UINT64_MAX));
+        // // 关门 VkFence不同于VkSemaphore,需要手动reset.
+        // VK_CHECK_RESULT(vkResetFences(device, 1, &presentFence));
+        // 发送信号给presentComplete
+        VkResult result = vkAcquireNextImageKHR(
+            device, swapChain, UINT64_MAX, presentComplete, (VkFence) nullptr,
+            &currentIndex);
+        // 提交缓冲区命令,执行完后发送信号给renderComplete
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmdBuffers[currentIndex];
+        // 等到命令完成后发送信号renderComplete
+        VK_CHECK_RESULT(
+            vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
+        // 提交渲染呈现到屏幕
+        VkPresentInfoKHR presentInfo = {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.pNext = nullptr;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &swapChain;
+        presentInfo.pImageIndices = &currentIndex;
+        // 等待renderComplete
+        presentInfo.pWaitSemaphores = &renderComplete;
+        presentInfo.waitSemaphoreCount = 1;
+        // 提交渲染呈现到屏幕
+        result = vkQueuePresentKHR(presentQueue, &presentInfo);
+        assert(result == VK_SUCCESS);
+        // // presentFence开门(发送信号量)
+        // VK_CHECK_RESULT(
+        //     vkQueueSubmit(presentQueue, 0, nullptr, presentFence));
+    }
+}
+
 void VulkanWindow::Run(std::function<void()> onPreDrawAction) {
     this->onPreDraw = onPreDrawAction;
 #if defined(_WIN32)
@@ -512,42 +581,34 @@ void VulkanWindow::Run(std::function<void()> onPreDrawAction) {
         if (quit) {
             break;
         }
-        if (onPreDraw) {
-            onPreDraw();
+        tick();
+    }
+#elif defined(__ANDROID__)
+    while (true) {
+        int ident;
+        int events;
+        struct android_poll_source* source;
+        bool destroy = false;
+
+        focused = true;
+        while ((ident = ALooper_pollAll(focused ? 0 : -1, NULL, &events,
+                                        (void**)&source)) >= 0) {
+            if (source != NULL) {
+                source->process(androidApp, source);
+            }
+            if (androidApp->destroyRequested != 0) {
+                LOGI("Android app destroy requested");
+                destroy = true;
+                break;
+            }
         }
-        if (bCanDraw) {
-            // // 等待开门,前面设置默认门是开的
-            // VK_CHECK_RESULT(
-            //     vkWaitForFences(device, 1, &presentFence, true, UINT64_MAX));
-            // // 关门 VkFence不同于VkSemaphore,需要手动reset.
-            // VK_CHECK_RESULT(vkResetFences(device, 1, &presentFence));
-            // 发送信号给presentComplete
-            VkResult result = vkAcquireNextImageKHR(
-                device, swapChain, UINT64_MAX, presentComplete,
-                (VkFence) nullptr, &currentIndex);
-            // 提交缓冲区命令,执行完后发送信号给renderComplete
-            submitInfo.commandBufferCount = 1;
-            submitInfo.pCommandBuffers = &cmdBuffers[currentIndex];
-            // 等到命令完成后发送信号renderComplete
-            VK_CHECK_RESULT(
-                vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
-            // 提交渲染呈现到屏幕
-            VkPresentInfoKHR presentInfo = {};
-            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            presentInfo.pNext = nullptr;
-            presentInfo.swapchainCount = 1;
-            presentInfo.pSwapchains = &swapChain;
-            presentInfo.pImageIndices = &currentIndex;
-            // 等待renderComplete
-            presentInfo.pWaitSemaphores = &renderComplete;
-            presentInfo.waitSemaphoreCount = 1;
-            // 提交渲染呈现到屏幕
-            result = vkQueuePresentKHR(presentQueue, &presentInfo);
-            assert(result == VK_SUCCESS);
-            // // presentFence开门(发送信号量)
-            // VK_CHECK_RESULT(
-            //     vkQueueSubmit(presentQueue, 0, nullptr, presentFence));
+        // App destruction requested
+        // Exit loop, example will be destroyed in application main
+        if (destroy) {
+            ANativeActivity_finish(androidApp->activity);
+            break;
         }
+        tick();
     }
 #endif
 }

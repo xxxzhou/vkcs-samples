@@ -1,0 +1,4 @@
+
+
+include ":vkcs1"
+project(":vkcs1").projectDir = new File("vkcs1")

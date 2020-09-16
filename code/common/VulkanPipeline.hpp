@@ -9,11 +9,14 @@
 namespace vkx {
 namespace common {
 
+#if _WIN32
 template class VKX_COMMON_EXPORT std::vector<VkDynamicState>;
 template class VKX_COMMON_EXPORT std::vector<VkDescriptorSetLayout>;
 template class VKX_COMMON_EXPORT std::vector<int32_t>;
 template class VKX_COMMON_EXPORT std::map<VkDescriptorType, uint32_t>;
 template class VKX_COMMON_EXPORT std::vector<std::vector<VkDescriptorSet>>;
+#endif
+
 // 可以由VulkanPipeline创建一个默认填充的FixPipelineState.
 // 根据渲染非透明/透明/后处理/GUBFFER/阴影 不同条件修改FixPipelineState
 struct FixPipelineState {
@@ -41,8 +44,9 @@ struct UBOLayoutItem {
     // 可以组合,简单来说,UBO可以绑定到几个shader阶段
     VkShaderStageFlags shaderStageFlags;
 };
-
+#if _WIN32
 template class VKX_COMMON_EXPORT std::vector<std::vector<UBOLayoutItem>>;
+#endif
 // 对应shader里固定结构的结构以及数据
 class VKX_COMMON_EXPORT UBOLayout {
    public:
@@ -61,7 +65,7 @@ class VKX_COMMON_EXPORT UBOLayout {
     std::vector<VkDescriptorSetLayout> descSetLayouts;
 
    public:
-    VkPipelineLayout pipelineLayout = nullptr;
+    VkPipelineLayout pipelineLayout;
     // 根据layout生成不同的
     std::vector<std::vector<VkDescriptorSet>> descSets;
 
@@ -86,6 +90,9 @@ class VKX_COMMON_EXPORT VulkanPipeline {
     static void CreateDefaultFixPipelineState(FixPipelineState& fixState);
 
     static VkPipelineShaderStageCreateInfo LoadShader(
+#if __ANDROID__
+        AAssetManager* assetManager,
+#endif
         VkDevice device, const std::string& fileName,
         VkShaderStageFlagBits stage);
 
