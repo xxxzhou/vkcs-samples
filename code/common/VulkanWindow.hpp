@@ -79,7 +79,9 @@ class VKX_COMMON_EXPORT VulkanWindow {
     std::vector<VkCommandBuffer> cmdBuffers;
     std::vector<VkImage> images;
     bool focused = false;
-
+#if defined(__ANDROID__)
+    std::function<void()> onInitVulkan;
+#endif
    public:
     VulkanWindow(class VulkanContext* _context);
     ~VulkanWindow();
@@ -89,12 +91,11 @@ class VKX_COMMON_EXPORT VulkanWindow {
                     const char* appName);
 
     LRESULT handleMessage(UINT msg, WPARAM wparam, LPARAM lparam);
-#endif
     // 根据窗口创建surface,并返回使用的queueIndex.
-#if defined(_WIN32)
     void InitSurface(HINSTANCE inst, HWND windowHandle);
 #elif defined(__ANDROID__)
-    void InitSurface(android_app* app);
+    void InitWindow(android_app* app, std::function<void()> onInitVulkanAction);
+    void InitSurface();
 #endif
     void CreateSwipChain(VkDevice _device,
                          std::function<void(uint32_t)> onBuildCmdAction);

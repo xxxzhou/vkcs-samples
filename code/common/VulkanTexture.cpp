@@ -150,6 +150,11 @@ void VulkanTexture::InitResource(class VulkanContext *context, uint32_t width,
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
     VK_CHECK_RESULT(vkCreateImageView(device, &viewInfo, nullptr, &view));
+    // 填充VkDescriptorImageInfo
+    descInfo.imageView = view;
+    descInfo.sampler = sampler;
+    // 渲染管线一般用VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,计算管线用general
+    descInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 }
 
 void VulkanTexture::AddBarrier(VkCommandBuffer command, VkImageLayout newLayout,
@@ -163,14 +168,6 @@ void VulkanTexture::AddBarrier(VkCommandBuffer command, VkImageLayout newLayout,
     layout = newLayout;
     stageFlags = newStageFlags;
     accessFlags = newAccessFlags;
-}
-
-VkDescriptorImageInfo VulkanTexture::GetDescInfo(VkImageLayout layout) {
-    VkDescriptorImageInfo descInfo;
-    descInfo.imageLayout = layout;
-    descInfo.imageView = view;
-    descInfo.sampler = sampler;
-    return descInfo;
 }
 
 }  // namespace common

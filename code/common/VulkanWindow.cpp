@@ -73,6 +73,7 @@ LRESULT VulkanWindow::handleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
     return 0;
 }
 #elif __ANDROID__
+
 void handleAppCommand(android_app* app, int32_t cmd) {
     assert(app->userData != NULL);
     VulkanWindow* window = reinterpret_cast<VulkanWindow*>(app->userData);
@@ -84,6 +85,8 @@ void handleAppCommand(android_app* app, int32_t cmd) {
             LOGI("          The sample ran successfully!!");
             LOGI("=================================================");
             LOGI("\n");
+            window->InitSurface();
+            window->onInitVulkan();
             break;
         case APP_CMD_TERM_WINDOW:
             // The window is being hidden or closed, clean it up.
@@ -100,12 +103,21 @@ void handleAppCommand(android_app* app, int32_t cmd) {
             LOGI("event not handled: %d", cmd);
     }
 }
+
+void VulkanWindow::InitWindow(android_app* app,
+                              std::function<void()> onInitVulkanAction) {
+    this->onInitVulkan = onInitVulkanAction;
+    this->androidApp = app;
+    this->androidApp->userData = this;
+    this->androidApp->onAppCmd = handleAppCommand;
+}
+
 #endif
 
 #if defined(_WIN32)
 void VulkanWindow::InitSurface(HINSTANCE inst, HWND windowHandle)
 #elif defined(__ANDROID__)
-void VulkanWindow::InitSurface(android_app* app)
+void VulkanWindow::InitSurface()
 #endif
 {
     VkResult ret = VK_SUCCESS;
@@ -117,14 +129,13 @@ void VulkanWindow::InitSurface(android_app* app)
     VK_CHECK_RESULT(vkCreateWin32SurfaceKHR(instance, &surfaceCreateInfo,
                                             nullptr, &surface));
 #elif defined(__ANDROID__)
-    this->androidApp = app;
-    this->androidApp->userData = this;
-    this->androidApp->onAppCmd = handleAppCommand;
     VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo = {};
     surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-    surfaceCreateInfo.window = app->window;
-    VK_CHECK_RESULT(vkCreateAndroidSurfaceKHR(instance, &surfaceCreateInfo,
-                                              NULL, &surface));
+    surfaceCreateInfo.window = androidApp->window;
+    surfaceCreateInfo.flags = 0;
+    surfaceCreateInfo.pNext = nullptr;
+    ret =
+        vkCreateAndroidSurfaceKHR(instance, &surfaceCreateInfo, NULL, &surface);
 #endif
     uint32_t queueFamilyCount = context->physicalDevice.queueFamilyProps.size();
     std::vector<VkBool32> supportsPresent(queueFamilyCount);
@@ -526,10 +537,10 @@ void VulkanWindow::createRenderPass() {
 }
 
 void VulkanWindow::tick() {
-    if (onPreDraw) {
-        onPreDraw();
-    }
     if (bCanDraw) {
+        if (onPreDraw) {
+            onPreDraw();
+        }
         // // 等待开门,前面设置默认门是开的
         // VK_CHECK_RESULT(
         //     vkWaitForFences(device, 1, &presentFence, true, UINT64_MAX));

@@ -15,6 +15,7 @@
 #include <android_native_app_glue.h>
 
 #include "errno.h"
+
 static android_app *androidApp = nullptr;
 #endif
 
@@ -105,24 +106,7 @@ void onPreCommand(uint32_t index) {
                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 }
 
-#if _WIN32
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
-#else __ANDROID__
-void android_main(struct android_app *app)
-#endif
-{
-    const char *title = "vkcs1";
-    context = std::make_unique<VulkanContext>();
-    context->CreateInstance(title);
-    window = std::make_unique<VulkanWindow>(context.get());
-#if _WIN32
-    window->InitWindow(hInstance, 1280, 720, title);
-#else __ANDROID__
-    // Forward cout/cerr to logcat.
-    // std::cout.rdbuf(new AndroidBuffer(ANDROID_LOG_INFO));
-    // std::cerr.rdbuf(new AndroidBuffer(ANDROID_LOG_ERROR));
-    window->InitSurface(app);
-#endif
+void initVulkan() {
     context->CreateDevice(window->graphicsQueueIndex);
     VulkanPipeline::CreateDefaultFixPipelineState(fixState);
     int32_t size = width * height * 4;
@@ -169,20 +153,20 @@ void android_main(struct android_app *app)
         {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT},
          {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT}});
     layout->GenerateLayout();
-    // 二个纹理对应的实体
-    layout->UpdateSetLayout(0, 0,
-                            csSrcTex->GetDescInfo(VK_IMAGE_LAYOUT_GENERAL),
-                            csDestTex->GetDescInfo(VK_IMAGE_LAYOUT_GENERAL));
+    // 二个纹理对应的实体,android临时变量会导致在函数内取出为空
+    csSrcTex->descInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    csDestTex->descInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    layout->UpdateSetLayout(0, 0, &csSrcTex->descInfo, &csDestTex->descInfo);
 #if _WIN32
     const std::string path =
         "D:/WorkSpace/github/vkcs-samples/code/data/hlsl/cs1.comp.spv";
 #elif __ANDROID__
-    const std::string path = getAssetPath() + "hlsl/cs1.comp.spv";
+    const std::string path = getAssetPath() + "glsl/cs1.comp.spv";
 #endif
 
     auto shaderInfo = VulkanPipeline::LoadShader(
 #if __ANDROID__
-        app->activity->assetManager,
+        androidApp->activity->assetManager,
 #endif
         context->logicalDevice.device, path, VK_SHADER_STAGE_COMPUTE_BIT);
     auto computePipelineInfo = VulkanPipeline::CreateComputePipelineInfo(
@@ -190,7 +174,33 @@ void android_main(struct android_app *app)
     VK_CHECK_RESULT(vkCreateComputePipelines(
         context->logicalDevice.device, context->pipelineCache, 1,
         &computePipelineInfo, nullptr, &computerPipeline));
-    window->CreateSwipChain(context->logicalDevice.device, onPreCommand);
     computeCommand();
+    window->CreateSwipChain(context->logicalDevice.device, onPreCommand);
+#if _WIN32
     window->Run(onPreDraw);  // onPreDraw
+#endif
+}
+
+#if _WIN32
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)
+#else __ANDROID__
+void android_main(struct android_app *app)
+#endif
+{
+    const char *title = "vkcs1";
+    context = std::make_unique<VulkanContext>();
+    context->CreateInstance(title);
+    window = std::make_unique<VulkanWindow>(context.get());
+#if _WIN32
+    window->InitWindow(hInstance, 1280, 720, title);
+    initVulkan();
+#else __ANDROID__
+    // Suppress link-time optimization that removes unreferenced code
+    // to make sure glue isn't stripped.
+    app_dummy();
+    androidApp = app;
+    // 需要等到window创建后
+    window->InitWindow(app, initVulkan);
+    window->Run(onPreDraw);
+#endif
 }

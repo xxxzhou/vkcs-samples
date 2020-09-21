@@ -3,13 +3,13 @@ import os
 import glob
 import subprocess
 
-if len(sys.argv) < 2:
-	sys.exit("Please provide a target directory")
+path = os.path.dirname(os.path.realpath(__file__))
+path = path.replace('\\', '/')
 
-if not os.path.exists(sys.argv[1]):
-	sys.exit("%s is not a valid directory" % sys.argv[1])
-
-path = sys.argv[1]
+if len(sys.argv) > 2:
+	if os.path.exists(sys.argv[1]):
+		# sys.exit("%s is not a valid directory" % sys.argv[1])
+		path = sys.argv[1]
 
 shaderfiles = []
 for exts in ('*.vert', '*.frag', '*.comp', '*.geom', '*.tesc', '*.tese'):

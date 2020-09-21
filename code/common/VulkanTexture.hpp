@@ -21,6 +21,7 @@ class VKX_COMMON_EXPORT VulkanTexture {
     VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     VkAccessFlags accessFlags = VK_ACCESS_HOST_WRITE_BIT;
+    VkDescriptorImageInfo descInfo;
 
    public:
     VulkanTexture();
@@ -36,9 +37,6 @@ class VKX_COMMON_EXPORT VulkanTexture {
     void AddBarrier(VkCommandBuffer command, VkImageLayout newLayout,
                     VkPipelineStageFlags newStageFlags,
                     VkAccessFlags newAccessFlags = 0);
-
-    // VkDescriptorImageInfo需要在渲染命令列表中确定,而初始化要求比较早
-    VkDescriptorImageInfo GetDescInfo(VkImageLayout layout);
 };
 }  // namespace common
 }  // namespace vkx

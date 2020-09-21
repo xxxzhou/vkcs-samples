@@ -160,16 +160,6 @@ void UBOLayout::UpdateSetLayout(uint32_t groupIndex, uint32_t setIndex, ...) {
                            0, nullptr);
 }
 
-// for (auto i = 0; i < group.size(); i++) {
-//     VkWriteDescriptorSet writeDesc = {};
-//     writeDesc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-//     writeDesc.dstSet = descSets[x][i];
-//     writeDesc.descriptorType = type;
-//     writeDesc.dstBinding = binding;
-//     writeDesc.pBufferInfo = bufferInfo;
-//     writeDesc.descriptorCount = descriptorCount; /* code */
-// }
-
 VulkanPipeline::VulkanPipeline(/* args */) {}
 
 VulkanPipeline::~VulkanPipeline() {}
