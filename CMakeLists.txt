@@ -120,7 +120,7 @@ endif()
 
 # 设定一些变量
 set(PYTHON_CMD ${PYTHON_EXECUTABLE})
-set(UTILS_NAME vsamputils)
+# set(UTILS_NAME vsamputils)
 set(UTILS_DIR "${CMAKE_SOURCE_DIR}/code/utils")
 set(COMMON_DIR "${CMAKE_SOURCE_DIR}/code/common")
 

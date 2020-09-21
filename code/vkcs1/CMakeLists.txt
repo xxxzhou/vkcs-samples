@@ -15,7 +15,7 @@ message(STATUS "xxxxx-" ${Vulkan_LIBRARIES})
 message(STATUS "xxxxx-" ${Vulkan_LIBRARY})
 message(STATUS "xxxxx-" ${VULKAN_LOADER_NAME})
 message(STATUS "xxxxx-" ${UTILS_NAME})
-target_link_libraries(vkcs1 ${UTILS_NAME} ${Vulkan_LIBRARIES} ${WINLIBS} vkxcommon)
+target_link_libraries(vkcs1 ${Vulkan_LIBRARIES} ${WINLIBS} vkxcommon)
 
 vkx_output(vkcs1)
 vkx_install(vkcs1)

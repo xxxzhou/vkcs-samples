@@ -40,7 +40,7 @@ add_subdirectory(common)
 # 执行vkcs1目录下的cmakelists
 add_subdirectory(vkcs1)
 
-add_subdirectory(utils)
+# add_subdirectory(utils)
 
 
 
